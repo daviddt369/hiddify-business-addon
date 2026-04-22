@@ -100,7 +100,10 @@ refresh_telegram_webhook() {
     if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
         return 0
     fi
-    local refresh_script="/tmp/hiddify_refresh_tg_webhook.py"
+    local refresh_script=""
+    local rc=0
+    umask 077
+    refresh_script="$(mktemp /tmp/hiddify_refresh_tg_webhook.XXXXXX.py)"
     cat >"$refresh_script" <<'PY'
 from hiddifypanel import create_app
 
@@ -110,9 +113,15 @@ with app.app_context():
     register_bot(set_hook=True)
     print("webhook_refresh_ok")
 PY
-    chmod 644 "$refresh_script"
-    su hiddify-panel -c "cd '$INSTALL_DIR/hiddify-panel' && source '$INSTALL_DIR/.venv313/bin/activate' && HIDDIFY_TELEGRAM_WEBHOOK_SECRET='${HIDDIFY_TELEGRAM_WEBHOOK_SECRET}' HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN='${HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN}' python3 '$refresh_script'" || true
+    chmod 600 "$refresh_script"
+    if su hiddify-panel -s /bin/bash -c "set -a; [ -f '$SECRETS_FILE' ] && . '$SECRETS_FILE'; set +a; cd '$INSTALL_DIR/hiddify-panel' && source '$INSTALL_DIR/.venv313/bin/activate' && python3 '$refresh_script'"; then
+        :
+    else
+        rc=$?
+        echo "WARNING: telegram webhook refresh failed with exit code $rc" >&2
+    fi
     rm -f "$refresh_script"
+    return 0
 }
 
 set_panel_setting() {
@@ -136,25 +145,27 @@ upsert_bool_config() {
 }
 
 write_secrets_env() {
+    local tmp_secrets=""
     mkdir -p "$SECRETS_DIR"
     chmod 700 "$SECRETS_DIR"
-
-    : >"$SECRETS_FILE"
-    chmod 600 "$SECRETS_FILE"
+    umask 077
+    tmp_secrets="$(mktemp "$SECRETS_DIR/panel-secrets.env.XXXXXX")"
+    chmod 600 "$tmp_secrets"
 
     if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET" ]]; then
-        printf 'HIDDIFY_TELEGRAM_WEBHOOK_SECRET=%s\n' "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET" >>"$SECRETS_FILE"
+        printf 'HIDDIFY_TELEGRAM_WEBHOOK_SECRET=%s\n' "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET" >>"$tmp_secrets"
     fi
     if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" ]]; then
-        printf 'HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN=%s\n' "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" >>"$SECRETS_FILE"
+        printf 'HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN=%s\n' "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" >>"$tmp_secrets"
     fi
     if [[ -n "$HIDDIFY_SUPPORT_URL" ]]; then
-        printf 'HIDDIFY_SUPPORT_URL=%s\n' "$HIDDIFY_SUPPORT_URL" >>"$SECRETS_FILE"
+        printf 'HIDDIFY_SUPPORT_URL=%s\n' "$HIDDIFY_SUPPORT_URL" >>"$tmp_secrets"
     fi
-    printf 'HIDDIFY_TELEGRAM_REGISTRATION_MODE=%s\n' "$HIDDIFY_TELEGRAM_REGISTRATION_MODE" >>"$SECRETS_FILE"
+    printf 'HIDDIFY_TELEGRAM_REGISTRATION_MODE=%s\n' "$HIDDIFY_TELEGRAM_REGISTRATION_MODE" >>"$tmp_secrets"
     if [[ "$ENABLE_TELEGRAM_PAYMENTS" == "1" && -n "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" ]]; then
-        printf 'HIDDIFY_TELEGRAM_PAYMENT_PROVIDER_TOKEN=%s\n' "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" >>"$SECRETS_FILE"
+        printf 'HIDDIFY_TELEGRAM_PAYMENT_PROVIDER_TOKEN=%s\n' "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" >>"$tmp_secrets"
     fi
+    mv -f "$tmp_secrets" "$SECRETS_FILE"
 }
 
 write_systemd_overrides() {
