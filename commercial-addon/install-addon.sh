@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_VERSION="v0.1.5"
+SCRIPT_VERSION="v0.1.7"
 INSTALL_DIR="${INSTALL_DIR:-/opt/hiddify-manager}"
 ADDON_REPO="${ADDON_REPO:-https://github.com/daviddt369/hiddify-business-addon.git}"
 ADDON_REF="${ADDON_REF:-$SCRIPT_VERSION}"
@@ -59,7 +59,7 @@ validate_addon_ref() {
         return 0
     fi
 
-    die "ADDON_REF должен быть pinned tag (например v0.1.5) или полным commit SHA. Для неприбитого ref явно укажи ALLOW_UNPINNED=1"
+    die "ADDON_REF должен быть pinned tag (например v0.1.7) или полным commit SHA. Для неприбитого ref явно укажи ALLOW_UNPINNED=1"
 }
 
 prepare_temp() {
@@ -68,6 +68,17 @@ prepare_temp() {
 }
 
 clone_addon_repo() {
+    if is_commit_sha "$ADDON_REF"; then
+        mkdir -p "$TMP_ROOT/addon"
+        git -C "$TMP_ROOT/addon" init >/dev/null 2>&1 || die "Не удалось инициализировать временный git repo"
+        git -C "$TMP_ROOT/addon" remote add origin "$ADDON_REPO" >/dev/null 2>&1 || die "Не удалось настроить origin для addon repo"
+        git -C "$TMP_ROOT/addon" fetch --depth 1 origin "$ADDON_REF" >/dev/null 2>&1 \
+            || die "Не удалось скачать addon repo по commit SHA: $ADDON_REPO ($ADDON_REF)"
+        git -C "$TMP_ROOT/addon" checkout --detach FETCH_HEAD >/dev/null 2>&1 \
+            || die "Не удалось переключиться на commit SHA: $ADDON_REF"
+        return 0
+    fi
+
     git clone --depth 1 --branch "$ADDON_REF" "$ADDON_REPO" "$TMP_ROOT/addon" >/dev/null 2>&1 \
         || die "Не удалось скачать addon repo: $ADDON_REPO ($ADDON_REF)"
 }
