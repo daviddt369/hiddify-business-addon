@@ -20,7 +20,7 @@
 Команда:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.4/relay-cert/install-dns01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.5/relay-cert/install-dns01.sh)
 ```
 
 Что дальше:
@@ -47,7 +47,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 Команда:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.4/relay-cert/install-http01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.5/relay-cert/install-http01.sh)
 ```
 
 Важно:
