@@ -32,3 +32,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 Подробности:
 
 - `docs/relay-ssl-ru.md`
+- для `http-01` на relay должен быть настроен proxy для:
+  - `/.well-known/acme-challenge/`
+- рекомендуемый файл на relay:
+  - `/etc/nginx/conf.d/meta.conf`

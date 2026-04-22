@@ -47,6 +47,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/main/relay-cert/install-http01.sh)
 ```
 
+Важно:
+
+- для `http-01` relay должен проксировать `/.well-known/acme-challenge/` на main server
+- точный пример для relay nginx смотри в:
+  - `docs/relay-ssl-ru.md`
+
 ## Структура
 
 - `commercial-addon/` — основной addon installer
