@@ -4,7 +4,7 @@
 
 Текущий pinned release для установки:
 
-- `v0.1.3`
+- `v0.1.4`
 
 Базовый принцип:
 
@@ -28,7 +28,7 @@ bash <(curl -fsSL https://i.hiddify.com/beta)
 ## Шаг 2. Коммерческая надстройка
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.3/commercial-addon/install-addon.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.4/commercial-addon/install-addon.sh)
 ```
 
 Что делает addon:
@@ -42,13 +42,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 ### Стандартный путь: `dns-01`
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.3/relay-cert/install-dns01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.4/relay-cert/install-dns01.sh)
 ```
 
 ### Advanced путь: `http-01` через relay ingress
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.3/relay-cert/install-http01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.4/relay-cert/install-http01.sh)
 ```
 
 Важно:

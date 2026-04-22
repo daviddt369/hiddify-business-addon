@@ -66,7 +66,12 @@ def _webhook_domain_override() -> str:
 def _webhook_secret_is_valid(request) -> bool:
     secret = _webhook_secret()
     if not secret:
-        return True
+        logger.error(
+            "Telegram webhook rejected: webhook secret is not configured. path=%s remote=%s",
+            request.path,
+            request.remote_addr,
+        )
+        return False
     received = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     return bool(received) and hmac.compare_digest(received, secret)
 
@@ -98,8 +103,12 @@ def register_bot(set_hook=False, remove_hook=False):
             if set_hook:
                 kwargs = {}
                 secret = _webhook_secret()
-                if secret:
-                    kwargs["secret_token"] = secret
+                if not secret:
+                    logger.error(
+                        "Telegram webhook registration skipped: webhook secret is not configured."
+                    )
+                    return
+                kwargs["secret_token"] = secret
                 bot.set_webhook(
                     url=f"https://{domain}/{admin_proxy_path}/{user_secret}/api/v2/tgbot/",
                     **kwargs,

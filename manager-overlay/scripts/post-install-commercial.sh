@@ -27,6 +27,32 @@ mysql_escape() {
     printf '%s' "$value"
 }
 
+existing_webhook_secret() {
+    if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET" ]]; then
+        printf '%s' "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET"
+        return 0
+    fi
+
+    if [[ -f "$SECRETS_FILE" ]]; then
+        grep '^HIDDIFY_TELEGRAM_WEBHOOK_SECRET=' "$SECRETS_FILE" 2>/dev/null | head -n1 | cut -d= -f2- || true
+    fi
+}
+
+ensure_webhook_secret() {
+    local existing=""
+    existing="$(existing_webhook_secret)"
+    if [[ -n "$existing" ]]; then
+        HIDDIFY_TELEGRAM_WEBHOOK_SECRET="$existing"
+        return 0
+    fi
+
+    HIDDIFY_TELEGRAM_WEBHOOK_SECRET="$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+)"
+}
+
 ensure_config_schema() {
     python3 - <<'PY'
 import re
@@ -273,6 +299,7 @@ print_summary() {
 
 main() {
     require_root
+    ensure_webhook_secret
     write_secrets_env
     write_systemd_overrides
     ensure_haproxy_runtime
