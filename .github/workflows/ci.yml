@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Shell syntax check
+        run: |
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < <(find . -type f -name '*.sh' | sort)
+
+      - name: ShellCheck
+        run: |
+          while IFS= read -r file; do
+            shellcheck "$file"
+          done < <(find . -type f -name '*.sh' | sort)
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python linters
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff bandit
+
+      - name: Python compile check
+        run: |
+          python -m compileall \
+            panel-overlay/hiddifypanel/panel/commercial \
+            manager-overlay
+
+      - name: Ruff syntax and undefined-name check
+        run: |
+          ruff check \
+            --select E9,F63,F7,F82 \
+            panel-overlay/hiddifypanel/panel/commercial \
+            manager-overlay
+
+      - name: Bandit high-severity check
+        run: |
+          bandit -q -r -lll \
+            panel-overlay/hiddifypanel/panel/commercial/restapi/v2 \
+            manager-overlay
+
+  route-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check route anomalies
+        run: |
+          ! grep -RFn '//api/' panel-overlay
+          ! grep -RFn 'url_prefix="//' panel-overlay
+          ! grep -RFn "url_prefix='//" panel-overlay
+          ! grep -RFn "add_url_rule('//" panel-overlay
+          ! grep -RFn "route('//" panel-overlay
