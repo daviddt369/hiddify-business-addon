@@ -2,6 +2,10 @@
 
 Этот репозиторий содержит только нашу надстройку над `official Hiddify`.
 
+Текущий pinned release для установки:
+
+- `v0.1.0`
+
 Базовый принцип:
 
 1. ставится **официальный Hiddify**
@@ -24,7 +28,7 @@ bash <(curl -fsSL https://i.hiddify.com/beta)
 ## Шаг 2. Коммерческая надстройка
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/main/commercial-addon/install-addon.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.0/commercial-addon/install-addon.sh)
 ```
 
 Что делает addon:
@@ -38,13 +42,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 ### Стандартный путь: `dns-01`
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/main/relay-cert/install-dns01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.0/relay-cert/install-dns01.sh)
 ```
 
 ### Advanced путь: `http-01` через relay ingress
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/main/relay-cert/install-http01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.1.0/relay-cert/install-http01.sh)
 ```
 
 Важно:
@@ -52,6 +56,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 - для `http-01` relay должен проксировать `/.well-known/acme-challenge/` на main server
 - точный пример для relay nginx смотри в:
   - `docs/relay-ssl-ru.md`
+- installer по умолчанию принимает только pinned tag или полный commit SHA
+- для неприбитой установки нужно явно задать:
+  - `ALLOW_UNPINNED=1`
 
 ## Структура
 

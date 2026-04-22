@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_VERSION="v0.1.0"
 INSTALL_DIR="${INSTALL_DIR:-/opt/hiddify-manager}"
 ADDON_REPO="${ADDON_REPO:-https://github.com/daviddt369/hiddify-business-addon.git}"
-ADDON_REF="${ADDON_REF:-main}"
+ADDON_REF="${ADDON_REF:-$SCRIPT_VERSION}"
+ALLOW_UNPINNED="${ALLOW_UNPINNED:-0}"
 TMP_ROOT="${TMP_ROOT:-/tmp/hiddify-business-addon}"
+MANIFEST_PATH="${MANIFEST_PATH:-$INSTALL_DIR/business-addon.manifest}"
 
 log() {
     echo "[commercial-addon] $*"
@@ -13,6 +16,14 @@ log() {
 die() {
     echo "[commercial-addon][ERROR] $*" >&2
     exit 1
+}
+
+is_commit_sha() {
+    [[ "$1" =~ ^[0-9a-f]{40}$ ]]
+}
+
+is_version_tag() {
+    [[ "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z._-]+)?$ ]]
 }
 
 require_root() {
@@ -36,6 +47,19 @@ check_supported_version() {
             die "Неподдерживаемая версия Hiddify: $version. Поддерживается только ветка 12.x"
             ;;
     esac
+}
+
+validate_addon_ref() {
+    if is_version_tag "$ADDON_REF" || is_commit_sha "$ADDON_REF"; then
+        return 0
+    fi
+
+    if [[ "$ALLOW_UNPINNED" == "1" ]]; then
+        log "ВНИМАНИЕ: используется неприбитый ref '$ADDON_REF' из-за ALLOW_UNPINNED=1"
+        return 0
+    fi
+
+    die "ADDON_REF должен быть pinned tag (например v0.1.0) или полным commit SHA. Для неприбитого ref явно укажи ALLOW_UNPINNED=1"
 }
 
 prepare_temp() {
@@ -98,6 +122,29 @@ PY
     rsync -a --delete --exclude '.git' "$repo_root/panel-overlay/hiddifypanel/" "$runtime_pkg/"
 }
 
+resolve_commit_sha() {
+    git -C "$TMP_ROOT/addon" rev-parse HEAD
+}
+
+write_manifest() {
+    local stamp="$1"
+    local commit_sha="$2"
+    local tmp_manifest
+    tmp_manifest="$(mktemp)"
+
+    cat > "$tmp_manifest" <<EOF
+INSTALL_TIMESTAMP=$stamp
+SCRIPT_VERSION=$SCRIPT_VERSION
+ADDON_REPO=$ADDON_REPO
+ADDON_REF=$ADDON_REF
+ADDON_COMMIT_SHA=$commit_sha
+INSTALL_DIR=$INSTALL_DIR
+EOF
+
+    install -m 0644 "$tmp_manifest" "$MANIFEST_PATH"
+    rm -f "$tmp_manifest"
+}
+
 print_intro() {
     cat <<'EOF'
 Business addon installer
@@ -116,20 +163,27 @@ EOF
 
 main() {
     local stamp
+    local commit_sha
     stamp="$(date +%F-%H%M%S)"
 
     require_root
     require_base_install
     check_supported_version
+    validate_addon_ref
     print_intro
     prepare_temp
     clone_addon_repo
+    commit_sha="$(resolve_commit_sha)"
     sync_manager_overlay "$stamp"
     sync_panel_overlay "$stamp"
+    write_manifest "$stamp" "$commit_sha"
 
     echo
     log "Overlay установлен."
     log "Бэкапы созданы с суффиксом .bak.$stamp"
+    log "Manifest записан в $MANIFEST_PATH"
+    log "Установленный ref: $ADDON_REF"
+    log "Commit SHA: $commit_sha"
     log "Запускаю interactive commercial finalize..."
     echo
 
