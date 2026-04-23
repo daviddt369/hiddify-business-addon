@@ -1,48 +1,53 @@
 import os
-from pathlib import Path
 
 from hiddifypanel.models import ConfigEnum, hconfig
 
+_SECRETS_FILE = "/etc/hiddify-panel/panel-secrets.env"
 
-SECRETS_FILE = Path("/etc/hiddify-panel/panel-secrets.env")
 
-
-def _env_or_file(*keys: str) -> str:
-    for key in keys:
-        value = (os.environ.get(key, "") or "").strip()
-        if value:
-            return value
-
+def _file_value(key: str) -> str:
     try:
-        with SECRETS_FILE.open("r", encoding="utf-8") as fh:
-            rows: dict[str, str] = {}
-            for raw_line in fh:
-                line = raw_line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                rows[key.strip()] = value.strip()
-        for key in keys:
-            value = rows.get(key, "").strip()
-            if value:
-                return value
+        with open(_SECRETS_FILE, "r", encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith(f"{key}="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
     except OSError:
         pass
     return ""
 
 
+def _env_or_file(primary: str, legacy: str = "") -> str:
+    value = (os.environ.get(primary, "") or "").strip()
+    if value:
+        return value
+    if legacy:
+        value = (os.environ.get(legacy, "") or "").strip()
+        if value:
+            return value
+    return _file_value(primary)
+
+
+def _hconfig_value(key: ConfigEnum) -> str:
+    try:
+        return (hconfig(key) or "").strip()
+    except RuntimeError:
+        return ""
+
+
 def telegram_bot_token() -> str:
+    # UI/DB value wins when an app context is available; env/file remains fallback.
     return (
-        _env_or_file("HIDDIFY_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
-        or (hconfig(ConfigEnum.telegram_bot_token) or "")
+        _hconfig_value(ConfigEnum.telegram_bot_token)
+        or _env_or_file("HIDDIFY_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
     ).strip()
 
 
 def telegram_payment_provider_token() -> str:
+    # UI/DB value wins when an app context is available; env/file remains fallback.
     return (
-        _env_or_file(
+        _hconfig_value(ConfigEnum.telegram_payment_provider_token)
+        or _env_or_file(
             "HIDDIFY_TELEGRAM_PAYMENT_PROVIDER_TOKEN",
             "TELEGRAM_PAYMENT_PROVIDER_TOKEN",
         )
-        or (hconfig(ConfigEnum.telegram_payment_provider_token) or "")
     ).strip()

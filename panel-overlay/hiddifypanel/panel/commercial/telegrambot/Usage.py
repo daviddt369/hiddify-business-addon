@@ -664,44 +664,36 @@ def _handle_phone_lookup(message, phone: str, allow_rebind: bool = False):
             )
         _send_user_home(message.chat.id, user)
         return
-    bot.reply_to(
-        message,
-        _(
-            "Вас нет в базе активных пользователей. "
-            "Обратитесь к администратору для создания аккаунта."
-        ),
-        reply_markup=_admin_contact_keyboard(),
-    )
-    if phone:
-        for admin in _telegram_admins():
-            try:
-                with force_locale(admin.lang or hconfig(ConfigEnum.admin_lang)):
-                    bot.send_message(
-                        admin.telegram_id,
-                        _(
-                            "Попытка входа в бота от номера, которого нет в базе:\n"
-                            "Телефон: %(phone)s\n"
-                            "Telegram ID: %(tgid)s",
-                            phone=phone,
-                            tgid=getattr(message.chat, "id", "-"),
-                        ),
-                    )
-            except Exception:
-                continue
     if not _auto_registration_enabled():
+        bot.reply_to(
+            message,
+            _(
+                "Вас нет в базе активных пользователей. "
+                "Обратитесь к администратору для создания аккаунта."
+            ),
+            reply_markup=_admin_contact_keyboard(),
+        )
+        if phone:
+            for admin in _telegram_admins():
+                try:
+                    with force_locale(admin.lang or hconfig(ConfigEnum.admin_lang)):
+                        bot.send_message(
+                            admin.telegram_id,
+                            _(
+                                "Попытка входа в бота от номера, которого нет в базе:\n"
+                                "Телефон: %(phone)s\n"
+                                "Telegram ID: %(tgid)s",
+                                phone=phone,
+                                tgid=getattr(message.chat, "id", "-"),
+                            ),
+                        )
+                except Exception:
+                    continue
         return
     user = _create_user_from_phone(phone, message.chat.id)
-    _send_first_link_welcome(message.chat.id, user)
     bot.reply_to(
         message,
-        _(
-            "Аккаунт создан.\n"
-            "Телефон: %(phone)s\n"
-            "UUID: %(uuid)s\n\n"
-            "Вам выдан тестовый период: 1 ГБ на 1 день.",
-            phone=phone or "-",
-            uuid=user.uuid,
-        ),
+        _("Аккаунт создан. Вам выдан тестовый период: 1 ГБ на 1 день."),
         reply_markup=_user_menu_keyboard(),
     )
     _notify_admins_for_user(

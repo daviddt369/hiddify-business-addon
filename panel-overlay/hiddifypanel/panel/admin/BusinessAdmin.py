@@ -11,6 +11,7 @@ from hiddifypanel.auth import login_required
 from hiddifypanel.database import db
 from hiddifypanel.models import ConfigEnum, Role, get_hconfigs, hconfig, set_hconfig
 from hiddifypanel.panel import hiddify
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token, telegram_payment_provider_token
 
 
 class BusinessSettingsForm(FlaskForm):
@@ -25,7 +26,7 @@ class BusinessSettingsForm(FlaskForm):
             ),
         ],
         description=_("Токен из @BotFather для работы коммерческого Telegram-бота."),
-        render_kw={"class": "ltr", "readonly": True, "placeholder": "server-only"},
+        render_kw={"class": "ltr", "placeholder": "123456789:AA..."},
     )
 
     telegram_webhook_domain = wtf.StringField(
@@ -42,7 +43,7 @@ class BusinessSettingsForm(FlaskForm):
             "Фиксированный домен для webhook. Если пусто - используется домен панели "
             "(полезно для стабильности webhook при нескольких direct-доменах)."
         ),
-        render_kw={"class": "ltr", "readonly": True, "placeholder": "server-only"},
+        render_kw={"class": "ltr", "placeholder": "tgbot.example.com"},
     )
 
     telegram_payment_provider_token = wtf.StringField(
@@ -110,9 +111,9 @@ class BusinessAdmin(FlaskView):
 
     def index(self):
         form = BusinessSettingsForm(
-            telegram_bot_token="",
+            telegram_bot_token=telegram_bot_token(),
             telegram_webhook_domain=hconfig(ConfigEnum.telegram_webhook_domain) or "",
-            telegram_payment_provider_token="",
+            telegram_payment_provider_token=telegram_payment_provider_token(),
             support_url=hconfig(ConfigEnum.support_url) or "",
             telegram_instruction_button_text=hconfig(ConfigEnum.telegram_instruction_button_text) or "Инструкция",
             telegram_welcome_message=hconfig(ConfigEnum.telegram_welcome_message) or "",
@@ -140,7 +141,9 @@ class BusinessAdmin(FlaskView):
             return render_template("business-settings.html", form=form)
 
         submitted = {
+            ConfigEnum.telegram_bot_token: (form.telegram_bot_token.data or "").strip(),
             ConfigEnum.telegram_webhook_domain: (form.telegram_webhook_domain.data or "").strip().lower(),
+            ConfigEnum.telegram_payment_provider_token: (form.telegram_payment_provider_token.data or "").strip(),
             ConfigEnum.support_url: (form.support_url.data or "").strip(),
             ConfigEnum.telegram_instruction_button_text: (form.telegram_instruction_button_text.data or "").strip() or "Инструкция",
             ConfigEnum.telegram_welcome_message: (form.telegram_welcome_message.data or "").strip(),

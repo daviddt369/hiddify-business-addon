@@ -4,19 +4,57 @@ from apiflask import abort
 from flask_restful import Resource
 # from flask_simplelogin import login_required
 import datetime
+import os
+import telebot
 
 from hiddifypanel.auth import login_required
 from hiddifypanel import hutils
 from hiddifypanel.models import *
-from .tgbot import bot
-from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
+
+_SECRETS_FILE = "/etc/hiddify-panel/panel-secrets.env"
+
+
+def _read_secret_file_value(key: str) -> str:
+    try:
+        with open(_SECRETS_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                name, value = line.split("=", 1)
+                if name == key:
+                    return value.strip().strip('\"').strip("'")
+    except OSError:
+        return ""
+    return ""
+
+
+def _telegram_bot_token() -> str:
+    try:
+        token = (hconfig(ConfigEnum.telegram_bot_token) or "").strip()
+        if token:
+            return token
+    except RuntimeError:
+        pass
+    token = (os.environ.get("HIDDIFY_TELEGRAM_BOT_TOKEN") or "").strip()
+    if token:
+        return token
+    return _read_secret_file_value("HIDDIFY_TELEGRAM_BOT_TOKEN")
+
+
+def _telegram_bot():
+    token = _telegram_bot_token()
+    if not token:
+        return None
+    return telebot.TeleBot(token, num_threads=1, parse_mode="HTML")
 
 
 class SendMsgResource(Resource):
     @login_required({Role.super_admin, Role.admin, Role.agent})
     def post(self, admin_uuid=None):
 
-        if not telegram_bot_token() or not bot:
+        bot = _telegram_bot()
+        if not bot:
             abort(400, 'invalid request')
 
         msg = request.json
@@ -41,7 +79,7 @@ class SendMsgResource(Resource):
             return {'msg': 'error', 'res': res}
 
     def get_users_by_identifier(self, identifier: str | list) -> List[User]:
-        '''Returns all users that match the identifier for sending a message to them'''
+        """Returns all users that match the identifier for sending a message to them"""
         # when we are here we must have g.account but ...
         if not hasattr(g, 'account'):
             return []

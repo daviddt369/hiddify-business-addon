@@ -18,7 +18,7 @@
 Рекомендуется для обычного пользователя.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.3/relay-cert/install-dns01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.4/relay-cert/install-dns01.sh)
 ```
 
 ### Advanced: `http-01`
@@ -26,7 +26,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-
 Для тех, кто контролирует relay ingress и хочет автоперевыпуск через panel/apply.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.3/relay-cert/install-http01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.4/relay-cert/install-http01.sh)
 ```
 
 Подробности:
