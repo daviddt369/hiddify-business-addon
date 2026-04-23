@@ -156,6 +156,10 @@ class ConfigEnum(metaclass=FastEnum):
     telegram_webhook_domain = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
     telegram_payment_provider_token = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
     support_url = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
+    telegram_welcome_message = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
+    telegram_instruction_button_text = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
+    telegram_subscription_expiry_reminder_days = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
+    telegram_subscription_expiry_reminder_message = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
     business_enabled = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
 
     # region child-parent

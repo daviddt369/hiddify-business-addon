@@ -82,6 +82,8 @@ class User(BaseAccount):
     details = db.relationship('UserDetail', cascade="all,delete", backref='user', lazy='dynamic',)
     plan = db.relationship('CommercialPlan', backref='users')
     enable = db.Column(db.Boolean, default=True, nullable=False)
+    telegram_welcome_sent = db.Column(db.Boolean, default=False, nullable=False)
+    telegram_last_expiry_reminder_key = db.Column(db.String(64), default="", nullable=False)
     ed25519_private_key = db.Column(db.String(500), default="")
     ed25519_public_key = db.Column(db.String(100), default="")
     wg_pk = db.Column(db.String(50), default="")

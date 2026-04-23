@@ -39,7 +39,7 @@ class BusinessSettingsForm(FlaskForm):
             ),
         ],
         description=_(
-            "Фиксированный домен для webhook. Если пусто — используется домен панели "
+            "Фиксированный домен для webhook. Если пусто - используется домен панели "
             "(полезно для стабильности webhook при нескольких direct-доменах)."
         ),
         render_kw={"class": "ltr"},
@@ -70,13 +70,39 @@ class BusinessSettingsForm(FlaskForm):
             ),
         ],
         description=_(
-            "Ссылка поддержки для пользователей, которых нет в базе "
-            "(используется в боте при закрытой регистрации пользователей)."
+            "Ссылка поддержки для пользователя, которая есть у него "
+            "(например в меню или кнопке обращения к администратору)."
         ),
         render_kw={"class": "ltr"},
     )
 
-    submit = wtf.SubmitField(_("Подтвердить"))
+    telegram_instruction_button_text = wtf.StringField(
+        _("Текст кнопки инструкции"),
+        validators=[wtf.validators.Optional(), wtf.validators.Length(max=64)],
+        description=_("Текст reply-кнопки, которая отправляет сохранённое приветственное сообщение."),
+    )
+
+    telegram_welcome_message = wtf.TextAreaField(
+        _("Приветственное сообщение / инструкция"),
+        validators=[wtf.validators.Optional(), wtf.validators.Length(max=4000)],
+        description=_("Сообщение один раз для новых пользователей Telegram и по кнопке Инструкция. Поддерживается HTML и ссылки."),
+        render_kw={"rows": 8},
+    )
+
+    telegram_subscription_expiry_reminder_days = wtf.StringField(
+        _("Дни до напоминания о продлении"),
+        validators=[wtf.validators.Optional(), wtf.validators.Length(max=64)],
+        description=_("Список через запятую, например 2,1. Бот напомнит за столько дней до окончания подписки."),
+    )
+
+    telegram_subscription_expiry_reminder_message = wtf.TextAreaField(
+        _("Текст напоминания о продлении"),
+        validators=[wtf.validators.Optional(), wtf.validators.Length(max=4000)],
+        description=_("Текст автоматического напоминания в Telegram. Доступен плейсхолдер {days_left}."),
+        render_kw={"rows": 5},
+    )
+
+    submit = wtf.SubmitField(_("Сохранить"))
 
 
 class BusinessAdmin(FlaskView):
@@ -88,6 +114,10 @@ class BusinessAdmin(FlaskView):
             telegram_webhook_domain=hconfig(ConfigEnum.telegram_webhook_domain) or "",
             telegram_payment_provider_token=hconfig(ConfigEnum.telegram_payment_provider_token) or "",
             support_url=hconfig(ConfigEnum.support_url) or "",
+            telegram_instruction_button_text=hconfig(ConfigEnum.telegram_instruction_button_text) or "Инструкция",
+            telegram_welcome_message=hconfig(ConfigEnum.telegram_welcome_message) or "",
+            telegram_subscription_expiry_reminder_days=hconfig(ConfigEnum.telegram_subscription_expiry_reminder_days) or "2,1",
+            telegram_subscription_expiry_reminder_message=hconfig(ConfigEnum.telegram_subscription_expiry_reminder_message) or "У вас заканчивается подписка через {days_left} дн. Не забудьте продлить тариф.",
         )
         return render_template("business-settings.html", form=form)
 
@@ -114,6 +144,10 @@ class BusinessAdmin(FlaskView):
             ConfigEnum.telegram_webhook_domain: (form.telegram_webhook_domain.data or "").strip().lower(),
             ConfigEnum.telegram_payment_provider_token: (form.telegram_payment_provider_token.data or "").strip(),
             ConfigEnum.support_url: (form.support_url.data or "").strip(),
+            ConfigEnum.telegram_instruction_button_text: (form.telegram_instruction_button_text.data or "").strip() or "Инструкция",
+            ConfigEnum.telegram_welcome_message: (form.telegram_welcome_message.data or "").strip(),
+            ConfigEnum.telegram_subscription_expiry_reminder_days: (form.telegram_subscription_expiry_reminder_days.data or "").strip() or "2,1",
+            ConfigEnum.telegram_subscription_expiry_reminder_message: (form.telegram_subscription_expiry_reminder_message.data or "").strip(),
         }
 
         for key, value in submitted.items():

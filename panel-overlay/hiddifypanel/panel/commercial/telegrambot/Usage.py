@@ -4,6 +4,7 @@ from flask_babel import gettext as _
 from flask_babel import force_locale
 from flask import current_app as app, has_request_context, g
 import datetime
+from celery import shared_task
 import os
 from sqlalchemy.exc import IntegrityError
 from hiddifypanel.models import *
@@ -18,6 +19,7 @@ TRIAL_PACKAGE_DAYS = 2
 TRIAL_MAX_IPS = 1
 _ADMIN_NOTIFY_DEDUP: dict[tuple[int, int | None, str], float] = {}
 _DEFAULT_SUPPORT_URL = "https://t.me/sisadmin_pro"
+_DEFAULT_INSTRUCTION_BUTTON_TEXT = "Инструкция"
 
 
 def _is_admin_chat(chat_id: int | None) -> bool:
@@ -70,6 +72,45 @@ def _admin_contact_keyboard():
             ]
         ]
     )
+
+
+def _telegram_welcome_message() -> str:
+    return ((hconfig(ConfigEnum.telegram_welcome_message) or "").strip())
+
+
+def _telegram_instruction_button_text() -> str:
+    return ((hconfig(ConfigEnum.telegram_instruction_button_text) or "").strip() or _DEFAULT_INSTRUCTION_BUTTON_TEXT)
+
+
+def _send_instruction_message(chat_id: int, user: User | None = None) -> bool:
+    message = _telegram_welcome_message()
+    if not message:
+        bot.send_message(chat_id, _("Инструкция пока не настроена."), reply_markup=_user_menu_keyboard())
+        return False
+    locale = (user.lang if user else None) or hconfig(ConfigEnum.lang)
+    try:
+        with force_locale(locale):
+            bot.send_message(chat_id, message, reply_markup=_user_menu_keyboard(), parse_mode="HTML", disable_web_page_preview=True)
+    except Exception:
+        bot.send_message(chat_id, message, reply_markup=_user_menu_keyboard(), disable_web_page_preview=True)
+    return True
+
+
+def _send_first_link_welcome(chat_id: int, user: User) -> bool:
+    if user.telegram_welcome_sent:
+        return False
+    message = _telegram_welcome_message()
+    if message:
+        locale = user.lang or hconfig(ConfigEnum.lang)
+        try:
+            with force_locale(locale):
+                bot.send_message(chat_id, message, reply_markup=_user_menu_keyboard(), parse_mode="HTML", disable_web_page_preview=True)
+        except Exception:
+            bot.send_message(chat_id, message, reply_markup=_user_menu_keyboard(), disable_web_page_preview=True)
+    user.telegram_welcome_sent = True
+    db.session.add(user)
+    db.session.commit()
+    return True
 
 
 def _auto_registration_enabled() -> bool:
@@ -402,12 +443,14 @@ def _user_menu_keyboard():
         types.KeyboardButton(text=_("Продлить тариф")),
         types.KeyboardButton(text=_("Моя подписка")),
     )
+    keyboard.row(types.KeyboardButton(text=_telegram_instruction_button_text()))
     return keyboard
 
 
 def _handle_user_menu_action(message):
     text = (message.text or "").strip()
-    if text not in {"Мой статус", "Мой тариф", "Сменить тариф", "Продлить тариф", "Моя подписка"}:
+    instruction_button_text = _telegram_instruction_button_text()
+    if text not in {"Мой статус", "Мой тариф", "Сменить тариф", "Продлить тариф", "Моя подписка", instruction_button_text}:
         return False
     user = User.query.filter(User.telegram_id == message.chat.id).order_by(User.id.desc()).first()
     if not user:
@@ -416,6 +459,9 @@ def _handle_user_menu_action(message):
             _("Отправьте номер телефона, который указан у вас в панели. Он используется как логин."),
             reply_markup=_phone_request_keyboard(),
         )
+        return True
+    if text == instruction_button_text:
+        _send_instruction_message(message.chat.id, user)
         return True
     if text in {"Мой статус", "Мой тариф"}:
         with force_locale(user.lang or hconfig(ConfigEnum.lang)):
@@ -514,9 +560,11 @@ def send_welcome(message):
         return
     text = message.text
     uuid = text.split()[-1] if len(text.split()) > 0 else None
+    new_binding = False
     if hutils.auth.is_uuid_valid(uuid):
         user = User.by_uuid(uuid)
         if user:
+            new_binding = not bool(user.telegram_id)
             if not _bind_user_to_telegram(user, message.chat.id):
                 bot.reply_to(
                     message,
@@ -530,6 +578,8 @@ def send_welcome(message):
     else:
         user = User.query.filter(User.telegram_id == message.chat.id).first()
     if user:
+        if new_binding:
+            _send_first_link_welcome(message.chat.id, user)
         _send_user_home(message.chat.id, user)
     else:
         bot.reply_to(
@@ -585,6 +635,7 @@ def _send_user_home(chat_id: int, user: User):
 def _handle_phone_lookup(message, phone: str, allow_rebind: bool = False):
     user = _find_user_by_phone(phone)
     if user:
+        new_binding = not bool(user.telegram_id)
         if not _bind_user_to_telegram(user, message.chat.id, force=allow_rebind):
             _notify_admins_for_user(
                 user,
@@ -644,6 +695,7 @@ def _handle_phone_lookup(message, phone: str, allow_rebind: bool = False):
     if not _auto_registration_enabled():
         return
     user = _create_user_from_phone(phone, message.chat.id)
+    _send_first_link_welcome(message.chat.id, user)
     bot.reply_to(
         message,
         _(
@@ -1113,3 +1165,70 @@ def user_send_sub(call):
             bot.answer_callback_query(call.id, cache_time=1)
         except Exception:
             pass
+
+
+_DEFAULT_EXPIRY_REMINDER_DAYS = "2,1"
+_DEFAULT_EXPIRY_REMINDER_MESSAGE = "У вас заканчивается подписка через {days_left} дн. Не забудьте продлить тариф."
+
+
+def _telegram_expiry_reminder_days() -> list[int]:
+    raw = (hconfig(ConfigEnum.telegram_subscription_expiry_reminder_days) or "").strip() or _DEFAULT_EXPIRY_REMINDER_DAYS
+    result = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part or not part.isdigit():
+            continue
+        day = int(part)
+        if day >= 0 and day not in result:
+            result.append(day)
+    return result
+
+
+def _telegram_expiry_reminder_message_template() -> str:
+    return (hconfig(ConfigEnum.telegram_subscription_expiry_reminder_message) or "").strip() or _DEFAULT_EXPIRY_REMINDER_MESSAGE
+
+
+def _render_expiry_reminder_message(user: User) -> str:
+    template = _telegram_expiry_reminder_message_template()
+    plan_name = user.plan.name if getattr(user, "plan", None) else ""
+    expire_rel = hutils.convert.format_timedelta(datetime.timedelta(days=user.remaining_days))
+    try:
+        return template.format(name=user.name or "", days_left=user.remaining_days, plan_name=plan_name, expire_rel=expire_rel)
+    except Exception:
+        return _DEFAULT_EXPIRY_REMINDER_MESSAGE.format(days_left=user.remaining_days)
+
+
+@shared_task(ignore_result=False)
+def send_expiry_reminders_task():
+    token = hconfig(ConfigEnum.telegram_bot_token)
+    if not token:
+        print("Telegram reminder skipped: telegram bot token is not configured")
+        return {"sent": 0, "checked": 0, "days": [], "error": "missing_token"}
+    bot.token = token
+    reminder_days = _telegram_expiry_reminder_days()
+    if not reminder_days:
+        return {"sent": 0, "checked": 0, "days": []}
+    today = datetime.date.today().isoformat()
+    checked = 0
+    sent = 0
+    users = User.query.filter(User.telegram_id.isnot(None), User.telegram_id != 0, User.enable == True).all()
+    for user in users:
+        checked += 1
+        days_left = int(user.remaining_days or 0)
+        if days_left not in reminder_days:
+            continue
+        if not user.is_active:
+            continue
+        reminder_key = f"{today}:{days_left}"
+        if (user.telegram_last_expiry_reminder_key or "") == reminder_key:
+            continue
+        try:
+            bot.send_message(int(user.telegram_id), _render_expiry_reminder_message(user), disable_web_page_preview=True)
+            user.telegram_last_expiry_reminder_key = reminder_key
+            db.session.add(user)
+            db.session.commit()
+            sent += 1
+        except Exception as exc:
+            db.session.rollback()
+            print(f"Failed to send expiry reminder to user {user.id}: {exc}")
+    return {"sent": sent, "checked": checked, "days": reminder_days}

@@ -38,6 +38,30 @@
               <small class="form-text text-muted">{{ form.support_url.description }}</small>
             </div>
 
+            <div class="form-group">
+              <label for="{{ form.telegram_instruction_button_text.id }}">{{ form.telegram_instruction_button_text.label.text }}</label>
+              {{ form.telegram_instruction_button_text(class_="form-control") }}
+              <small class="form-text text-muted">{{ form.telegram_instruction_button_text.description }}</small>
+            </div>
+
+            <div class="form-group">
+              <label for="{{ form.telegram_welcome_message.id }}">{{ form.telegram_welcome_message.label.text }}</label>
+              {{ form.telegram_welcome_message(class_="form-control") }}
+              <small class="form-text text-muted">{{ form.telegram_welcome_message.description }}</small>
+            </div>
+
+            <div class="form-group">
+              <label for="{{ form.telegram_subscription_expiry_reminder_days.id }}">{{ form.telegram_subscription_expiry_reminder_days.label.text }}</label>
+              {{ form.telegram_subscription_expiry_reminder_days(class_="form-control") }}
+              <small class="form-text text-muted">{{ form.telegram_subscription_expiry_reminder_days.description }}</small>
+            </div>
+
+            <div class="form-group">
+              <label for="{{ form.telegram_subscription_expiry_reminder_message.id }}">{{ form.telegram_subscription_expiry_reminder_message.label.text }}</label>
+              {{ form.telegram_subscription_expiry_reminder_message(class_="form-control") }}
+              <small class="form-text text-muted">{{ form.telegram_subscription_expiry_reminder_message.description }}</small>
+            </div>
+
             <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
           </form>
         </div>

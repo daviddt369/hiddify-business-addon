@@ -33,6 +33,7 @@ def init_app(app):
     # },
 # }
     from hiddifypanel.panel.cli import backup_task
+    from hiddifypanel.panel.commercial.telegrambot.Usage import send_expiry_reminders_task
     celery_app.autodiscover_tasks()
     # celery_app.add_periodic_task(30.0, backup_task.s(), name='backup task')
     # celery_app.add_periodic_task(
@@ -44,6 +45,11 @@ def init_app(app):
         crontab(hour="*/6", minute="0"),
         backup_task.s(),
         name="backup_task "
+    )
+    celery_app.add_periodic_task(
+        crontab(hour="9", minute="0"),
+        send_expiry_reminders_task.s(),
+        name="send_expiry_reminders_task"
     )
     
     celery_app.set_default()
@@ -91,6 +97,7 @@ def init_app_no_flask():
     # },
 # }
     from hiddifypanel.panel.cli import backup_task
+    from hiddifypanel.panel.commercial.telegrambot.Usage import send_expiry_reminders_task
     celery_app.autodiscover_tasks()
     # celery_app.add_periodic_task(30.0, backup_task.s(), name='backup task')
     # celery_app.add_periodic_task(
@@ -103,6 +110,11 @@ def init_app_no_flask():
         # crontab(hour="*", minute="*"),
         backup_task.s(),
         name="backup_task "
+    )
+    celery_app.add_periodic_task(
+        crontab(hour="9", minute="0"),
+        send_expiry_reminders_task.s(),
+        name="send_expiry_reminders_task"
     )
     
     celery_app.set_default()

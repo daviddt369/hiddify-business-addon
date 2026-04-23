@@ -15,7 +15,7 @@ from hiddifypanel.database import db, db_execute
 
 
 from loguru import logger
-MAX_DB_VERSION = 132
+MAX_DB_VERSION = 135
 _BOOTSTRAP_DOMAIN_FALLBACKS = [
     "fa.wikipedia.org",
     "en.wikipedia.org",
@@ -144,6 +144,10 @@ def _init_local_sqlite_db():
         ConfigEnum.telegram_webhook_domain: "",
         ConfigEnum.telegram_payment_provider_token: "",
         ConfigEnum.support_url: "",
+        ConfigEnum.telegram_welcome_message: "",
+        ConfigEnum.telegram_instruction_button_text: "Инструкция",
+        ConfigEnum.telegram_subscription_expiry_reminder_days: "2,1",
+        ConfigEnum.telegram_subscription_expiry_reminder_message: "У вас заканчивается подписка через {days_left} дн. Не забудьте продлить тариф.",
         ConfigEnum.package_mode: "release",
         ConfigEnum.cloudflare: "",
         ConfigEnum.country: "ru",
@@ -264,6 +268,22 @@ def _v131(child_id):
 
 def _v132(child_id):
     add_config_if_not_exist(ConfigEnum.business_enabled, False)
+
+
+def _v133(child_id):
+    add_config_if_not_exist(ConfigEnum.telegram_welcome_message, "")
+    add_config_if_not_exist(ConfigEnum.telegram_instruction_button_text, "Инструкция")
+
+
+def _v134(child_id):
+    add_column(User.telegram_welcome_sent)
+    add_column(User.telegram_last_expiry_reminder_key)
+    add_config_if_not_exist(ConfigEnum.telegram_subscription_expiry_reminder_days, "2,1")
+    add_config_if_not_exist(
+        ConfigEnum.telegram_subscription_expiry_reminder_message,
+        "У вас заканчивается подписка через {days_left} дн. Не забудьте продлить тариф.",
+    )
+
 
 def _v111(child_id):
     set_hconfig(ConfigEnum.path_naive, hutils.random.get_random_string(7, 15))
