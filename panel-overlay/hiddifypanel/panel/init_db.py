@@ -1033,7 +1033,15 @@ def add_new_enum_values():
         # result = db.engine.execute(f"SELECT DISTINCT `{column_name}` FROM {table_name}")
         # db_values = {row[0] for row in result}
 
-        result = db.session.execute(text(f"SHOW COLUMNS FROM {table_name} LIKE '{column_name}';")).fetchall()
+        import re
+        safe_name = re.compile(r"^[A-Za-z0-9_]+$")
+        safe_enum_value = re.compile(r"^[A-Za-z0-9_.-]+$")
+        table_name_str = str(table_name)
+        if not safe_name.fullmatch(table_name_str) or not safe_name.fullmatch(column_name):
+            raise RuntimeError(f"Unsafe SQL identifier in enum migration: {table_name_str}.{column_name}")
+        if not all(safe_enum_value.fullmatch(str(v)) for v in existing_values):
+            raise RuntimeError(f"Unsafe enum values for migration: {table_name_str}.{column_name}")
+        result = db.session.execute(text(f"SHOW COLUMNS FROM {table_name_str} LIKE :column_name"), {"column_name": column_name}).fetchall()
         db_values = []
 
         for row in result:
@@ -1054,8 +1062,8 @@ def add_new_enum_values():
         enumstr = ','.join([f"'{a}'" for a in [*existing_values]])
         expired_enumstr = ','.join([f"'{a}'" for a in [*old_values]])
         if expired_enumstr:
-            db_execute(f"delete from {table_name} where `{column_name}` in ({expired_enumstr});", commit=True)
-        db_execute(f"ALTER TABLE {table_name} MODIFY COLUMN `{column_name}` ENUM({enumstr});", commit=True)
+            db_execute(f"delete from {table_name_str} where `{column_name}` in ({expired_enumstr});", commit=True)
+        db_execute(f"ALTER TABLE {table_name_str} MODIFY COLUMN `{column_name}` ENUM({enumstr});", commit=True)
 
 
 def current_db_version()->int:
@@ -1130,7 +1138,7 @@ def init_db():
         tmp_uuid = str(uuid.uuid4())
         db.session.add(Child(id=0, unique_id=tmp_uuid, name="Root"))
         db.session.commit()
-        db_execute(f"update child set id=0 where unique_id='{tmp_uuid}'", commit=True)
+        db.session.execute(text("update child set id=0 where unique_id=:uid"), {"uid": tmp_uuid})
         child = Child.by_id(0)  
 
     child.mode = ChildMode.virtual
