@@ -38,6 +38,31 @@ existing_webhook_secret() {
     fi
 }
 
+existing_secret_value() {
+    local key="$1"
+    if [[ -f "$SECRETS_FILE" ]]; then
+        grep "^${key}=" "$SECRETS_FILE" 2>/dev/null | head -n1 | cut -d= -f2- || true
+    fi
+}
+
+ensure_existing_secret_values() {
+    if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
+        TELEGRAM_BOT_TOKEN="$(existing_secret_value HIDDIFY_TELEGRAM_BOT_TOKEN)"
+    fi
+    if [[ -z "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" ]]; then
+        TELEGRAM_PAYMENT_PROVIDER_TOKEN="$(existing_secret_value HIDDIFY_TELEGRAM_PAYMENT_PROVIDER_TOKEN)"
+    fi
+    if [[ -z "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" ]]; then
+        HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN="$(existing_secret_value HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN)"
+    fi
+    if [[ -z "$HIDDIFY_SUPPORT_URL" ]]; then
+        HIDDIFY_SUPPORT_URL="$(existing_secret_value HIDDIFY_SUPPORT_URL)"
+    fi
+    if [[ -z "${HIDDIFY_TELEGRAM_REGISTRATION_MODE:-}" ]]; then
+        HIDDIFY_TELEGRAM_REGISTRATION_MODE="$(existing_secret_value HIDDIFY_TELEGRAM_REGISTRATION_MODE)"
+    fi
+}
+
 ensure_webhook_secret() {
     local existing=""
     existing="$(existing_webhook_secret)"
@@ -123,9 +148,6 @@ panel_cli() {
 }
 
 refresh_telegram_webhook() {
-    if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
-        return 0
-    fi
     local refresh_script=""
     local rc=0
     umask 077
@@ -170,6 +192,11 @@ upsert_bool_config() {
     mysql hiddifypanel -e "INSERT INTO bool_config (child_id, \`key\`, value) VALUES (0, '$key', $value) ON DUPLICATE KEY UPDATE value=VALUES(value);"
 }
 
+delete_str_config() {
+    local key="$1"
+    mysql hiddifypanel -e "DELETE FROM str_config WHERE child_id=0 AND \`key\`='$key';"
+}
+
 write_secrets_env() {
     local tmp_secrets=""
     mkdir -p "$SECRETS_DIR"
@@ -180,6 +207,9 @@ write_secrets_env() {
 
     if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET" ]]; then
         printf 'HIDDIFY_TELEGRAM_WEBHOOK_SECRET=%s\n' "$HIDDIFY_TELEGRAM_WEBHOOK_SECRET" >>"$tmp_secrets"
+    fi
+    if [[ -n "$TELEGRAM_BOT_TOKEN" ]]; then
+        printf 'HIDDIFY_TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN" >>"$tmp_secrets"
     fi
     if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" ]]; then
         printf 'HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN=%s\n' "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" >>"$tmp_secrets"
@@ -212,29 +242,19 @@ EOF
 configure_panel() {
     ensure_config_schema
     upsert_bool_config "business_enabled" 1
-    if [[ -n "$TELEGRAM_BOT_TOKEN" ]]; then
-        upsert_str_config "telegram_bot_token" "$TELEGRAM_BOT_TOKEN"
-    fi
+    delete_str_config "telegram_bot_token"
     if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" ]]; then
         upsert_str_config "telegram_webhook_domain" "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN"
     fi
-    if [[ "$ENABLE_TELEGRAM_PAYMENTS" == "1" && -n "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" ]]; then
-        upsert_str_config "telegram_payment_provider_token" "$TELEGRAM_PAYMENT_PROVIDER_TOKEN"
-    fi
+    delete_str_config "telegram_payment_provider_token"
     if [[ -n "$HIDDIFY_SUPPORT_URL" ]]; then
         upsert_str_config "support_url" "$HIDDIFY_SUPPORT_URL"
     fi
 
     # Keep official CLI in sync for keys it already understands.
     set_panel_setting "business_enabled" "true" || true
-    if [[ -n "$TELEGRAM_BOT_TOKEN" ]]; then
-        set_panel_setting "telegram_bot_token" "$TELEGRAM_BOT_TOKEN" || true
-    fi
     if [[ -n "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" ]]; then
         set_panel_setting "telegram_webhook_domain" "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN" || true
-    fi
-    if [[ "$ENABLE_TELEGRAM_PAYMENTS" == "1" && -n "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" ]]; then
-        set_panel_setting "telegram_payment_provider_token" "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" || true
     fi
     if [[ -n "$HIDDIFY_SUPPORT_URL" ]]; then
         set_panel_setting "support_url" "$HIDDIFY_SUPPORT_URL" || true
@@ -300,6 +320,7 @@ print_summary() {
 main() {
     require_root
     ensure_webhook_secret
+    ensure_existing_secret_values
     write_secrets_env
     write_systemd_overrides
     ensure_haproxy_runtime

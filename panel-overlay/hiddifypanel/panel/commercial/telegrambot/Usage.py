@@ -9,6 +9,7 @@ import os
 from sqlalchemy.exc import IntegrityError
 from hiddifypanel.models import *
 from . import bot
+from .secrets import telegram_bot_token, telegram_payment_provider_token
 from hiddifypanel.panel.user.user import get_common_data
 from hiddifypanel.database import db
 from hiddifypanel import hutils
@@ -192,12 +193,7 @@ def _public_plans() -> list[CommercialPlan]:
 
 
 def _payment_provider_token() -> str:
-    return (
-        (hconfig(ConfigEnum.telegram_payment_provider_token) or "")
-        or
-        os.environ.get("HIDDIFY_TELEGRAM_PAYMENT_PROVIDER_TOKEN", "")
-        or os.environ.get("TELEGRAM_PAYMENT_PROVIDER_TOKEN", "")
-    ).strip()
+    return telegram_payment_provider_token()
 
 
 def _payments_enabled() -> bool:
@@ -1200,7 +1196,7 @@ def _render_expiry_reminder_message(user: User) -> str:
 
 @shared_task(ignore_result=False)
 def send_expiry_reminders_task():
-    token = hconfig(ConfigEnum.telegram_bot_token)
+    token = telegram_bot_token()
     if not token:
         print("Telegram reminder skipped: telegram bot token is not configured")
         return {"sent": 0, "checked": 0, "days": [], "error": "missing_token"}

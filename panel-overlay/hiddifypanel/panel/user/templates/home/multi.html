@@ -325,7 +325,7 @@
 
 <script>
 
-    {% if hconfig(ConfigEnum.telegram_bot_token) and g.bot and not g.account.telegram_id %}
+    {% if telegram_bot_token() and g.bot and not g.account.telegram_id %}
 
     if (Cookies.get('show_connect_telegram') != 'no') {
         bootbox.confirm({

@@ -14,6 +14,7 @@ from hiddifypanel.database import db
 from hiddifypanel.panel.init_db import init_db
 
 from loguru import logger
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 
 def drop_db():
     """Cleans database"""
@@ -42,7 +43,7 @@ def backup_task():
     with open(dst, 'w', encoding='utf-8') as fp:
         json.dump(dbdict, fp, indent=2, sort_keys=True, default=str)
     print(dst)
-    if hconfig(ConfigEnum.telegram_bot_token):
+    if telegram_bot_token():
         from hiddifypanel.panel.commercial.telegrambot import bot, register_bot
         if not bot.username:
             register_bot(False)
@@ -213,7 +214,7 @@ def init_app(app):
 
     @ app.cli.command()
     def tgbot_info():
-        if not hconfig(ConfigEnum.telegram_bot_token):
+        if not telegram_bot_token():
             print('You didn\'t specified your telegram bot token')
             return
 

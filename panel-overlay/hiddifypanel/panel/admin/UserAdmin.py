@@ -23,6 +23,7 @@ from hiddifypanel.panel import hiddify, custom_widgets
 from hiddifypanel.auth import login_required
 from hiddifypanel import hutils
 from hiddifypanel.commercial_logic import renew_user_package
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 
 
 class UserAdmin(AdminLTEModelView):
@@ -140,7 +141,7 @@ class UserAdmin(AdminLTEModelView):
         else:
             link = '<i class="fa-solid fa-circle-xmark text-danger"></i> '
 
-        if hconfig(ConfigEnum.telegram_bot_token):
+        if telegram_bot_token():
             if model.telegram_id:
                 link += f'<button class="btn hbtn bg-h-blue btn-xs " onclick="show_send_message({model.id})" ><i class="fa-solid fa-paper-plane"></i></button> '
             else:

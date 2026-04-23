@@ -12,6 +12,7 @@ from hiddifypanel import cache, hutils
 from hiddifypanel.accesslog import collect_recent_ips
 from hiddifypanel.dev_runtime import is_local_sqlite_enabled
 from loguru import logger
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 import json
 to_gig_d = 1024**3
 
@@ -353,7 +354,7 @@ def _apply_usages_sqlite(usages: list[dict], cur_time: datetime.datetime):
 
 
 def send_bot_message(user):
-    if not (hconfig(ConfigEnum.telegram_bot_token) or hutils.node.is_child()):
+    if not (telegram_bot_token() or hutils.node.is_child()):
         return
     if not user.telegram_id:
         return

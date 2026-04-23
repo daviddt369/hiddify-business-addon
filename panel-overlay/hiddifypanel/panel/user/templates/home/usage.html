@@ -41,7 +41,7 @@
             </div>
         </div>
 
-        {% if hconfig(ConfigEnum.telegram_bot_token) and g.bot %}
+        {% if telegram_bot_token() and g.bot %}
         <a href="tg://resolve?domain={{g.bot.username}}&start={{user.uuid}}" class="card-footer">
             <i class="fa-brands fa-telegram"></i> {{_('View in Telegram')}}
         </a>

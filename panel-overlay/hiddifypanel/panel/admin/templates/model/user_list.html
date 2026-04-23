@@ -1,7 +1,7 @@
 {% extends 'hiddify-flask-admin/list.html' %}
 
 {% block body %}
-{% if hconfig(ConfigEnum.telegram_bot_token) and g.bot %}
+{% if telegram_bot_token() and g.bot %}
 <div class="callout callout-success">
     <details>
         <summary>

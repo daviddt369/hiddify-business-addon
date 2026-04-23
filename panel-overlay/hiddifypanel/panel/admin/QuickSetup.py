@@ -17,6 +17,7 @@ from hiddifypanel.models import Domain, DomainType, StrConfig, ConfigEnum, get_h
 from hiddifypanel.database import db
 from hiddifypanel.auth import login_required
 from hiddifypanel import hutils
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 from hiddifypanel.models import *
 
 
@@ -239,7 +240,7 @@ def get_quick_setup_form(empty=False):
             # Quick setup is the first place where the real panel domain is known.
             # Refresh the Telegram webhook here so clean installs don't keep the
             # fallback IP/sslip webhook from the bootstrap phase.
-            if hconfig(ConfigEnum.telegram_bot_token):
+            if telegram_bot_token():
                 from hiddifypanel.panel.commercial.telegrambot import register_bot
                 register_bot(set_hook=True)
             # hiddify.bulk_register_configs([

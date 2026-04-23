@@ -12,6 +12,7 @@ from hiddifypanel.auth import current_account
 from apiflask import APIFlask, HTTPError, abort
 from hiddifypanel import hutils
 from loguru import logger
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 
 
 def init_app(app: APIFlask):
@@ -22,6 +23,7 @@ def init_app(app: APIFlask):
     app.jinja_env.globals['g'] = g
     app.jinja_env.globals['hutils'] = hutils
     app.jinja_env.globals['hiddify'] = hiddify
+    app.jinja_env.globals['telegram_bot_token'] = telegram_bot_token
     app.jinja_env.globals['version'] = hiddifypanel.__version__
     if not hiddifypanel.is_released_version:
         app.jinja_env.globals['version']= "DEV"
@@ -178,7 +180,7 @@ def init_app(app: APIFlask):
         g.pwa = session.get('pwa', False)
 
         # setup telegram bot
-        if hconfig(ConfigEnum.telegram_bot_token):
+        if telegram_bot_token():
             import hiddifypanel.panel.commercial.telegrambot as telegrambot
             g.bot = telegrambot.bot
         else:
@@ -191,7 +193,7 @@ def init_app(app: APIFlask):
     with app.app_context():
         import hiddifypanel.panel.commercial.telegrambot as telegrambot
         local_dev = os.environ.get("HIDDIFY_LOCAL_SQLITE", "").lower() in {"1", "true", "yes", "on"}
-        if local_dev and not hconfig(ConfigEnum.telegram_bot_token):
+        if local_dev and not telegram_bot_token():
             return
         if (not telegrambot.bot) or (not telegrambot.bot.username):  # type: ignore
             telegrambot.register_bot_cached(set_hook=True)

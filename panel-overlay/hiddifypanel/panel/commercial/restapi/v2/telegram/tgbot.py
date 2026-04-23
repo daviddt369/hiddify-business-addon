@@ -9,6 +9,7 @@ import os
 import hmac
 
 from hiddifypanel.models import *
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 # NOTE: v2 copy of telegram webhook handler to avoid v2->v1 runtime dependency.
 from hiddifypanel import Events
 from hiddifypanel.cache import cache
@@ -97,9 +98,9 @@ def register_bot_cached(set_hook=False, remove_hook=False):
 def register_bot(set_hook=False, remove_hook=False):
     try:
         global bot
-        token = hconfig(ConfigEnum.telegram_bot_token)
+        token = telegram_bot_token()
         if token:
-            bot.token = hconfig(ConfigEnum.telegram_bot_token)
+            bot.token = token
             try:
                 bot.username = bot.get_me().username
             except BaseException:
@@ -138,7 +139,7 @@ def register_bot(set_hook=False, remove_hook=False):
 def init_app(app):
     with app.app_context():
         global bot
-        token = hconfig(ConfigEnum.telegram_bot_token)
+        token = telegram_bot_token()
         if token:
             bot.token = token
             try:
@@ -159,7 +160,7 @@ class TGBotResource(Resource):
                 return Response("", status=403)
             content_type = (request.headers.get('content-type') or '').lower()
             if content_type.startswith('application/json'):
-                token = hconfig(ConfigEnum.telegram_bot_token)
+                token = telegram_bot_token()
                 if token:
                     bot.token = token
                 json_string = request.get_data().decode('utf-8')

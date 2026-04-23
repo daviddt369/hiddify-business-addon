@@ -9,13 +9,14 @@ from hiddifypanel.auth import login_required
 from hiddifypanel import hutils
 from hiddifypanel.models import *
 from .tgbot import bot
+from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token
 
 
 class SendMsgResource(Resource):
     @login_required({Role.super_admin, Role.admin, Role.agent})
     def post(self, admin_uuid=None):
 
-        if not hconfig(ConfigEnum.telegram_bot_token) or not bot:
+        if not telegram_bot_token() or not bot:
             abort(400, 'invalid request')
 
         msg = request.json
