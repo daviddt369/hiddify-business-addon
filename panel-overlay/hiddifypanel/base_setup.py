@@ -27,7 +27,10 @@ def init_app(app):
         )
         
 
-        app.secret_key="asdsad"
+        secret_key = os.environ.get("SECRET_KEY") or app.config.get("SECRET_KEY")
+        if not secret_key:
+            raise RuntimeError("SECRET_KEY is not configured")
+        app.secret_key = secret_key
         app.servers = {
             'name': 'current',
             'url': '',

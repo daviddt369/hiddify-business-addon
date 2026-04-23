@@ -4,8 +4,6 @@ from marshmallow import Schema, fields
 
 from apiflask import APIBlueprint
 from flask_restful import Api
-from .tgbot import bot, register_bot, register_bot_cached, TGBotResource
-from . import tgbot
 from .tgmsg import SendMsgResource
 from .resources import *
 bp = APIBlueprint("api_v1", __name__, url_prefix="/<proxy_path>/api/v1/", tag="api_v1", enable_openapi=False)
@@ -15,7 +13,6 @@ api_uuid = Api(bp_uuid)
 
 
 def init_app(app):
-    tgbot.init_app(app)
     api.add_resource(UserResource, "/user/")
     api.add_resource(AdminUserResource, "/admin/")
     # api.add_resource(TGBotResource, "/tgbot/")

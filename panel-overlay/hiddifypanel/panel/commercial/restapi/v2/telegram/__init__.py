@@ -18,5 +18,5 @@ api_uuid = Api(bp_uuid)
 
 
 def init_app(app):
-    api_uuid.add_resource(TGBotResource, "/tgbot/")
+    api_uuid.add_resource(TGBotResource, "tgbot/")
     app.register_blueprint(bp_uuid)
