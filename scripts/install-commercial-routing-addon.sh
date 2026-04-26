@@ -55,8 +55,28 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
 }
 
+find_xray_bin() {
+  if command -v xray >/dev/null 2>&1; then
+    command -v xray
+    return 0
+  fi
+
+  if [[ -x "$HIDDIFY_DIR/xray/bin/xray" ]]; then
+    echo "$HIDDIFY_DIR/xray/bin/xray"
+    return 0
+  fi
+
+  if [[ -x "/usr/bin/xray" ]]; then
+    echo "/usr/bin/xray"
+    return 0
+  fi
+
+  fail "Cannot find xray binary"
+}
+
 backup_file() {
   local path="$1"
+
   if [[ -e "$path" ]]; then
     mkdir -p "$BACKUP_DIR/$(dirname "$path")"
     cp -a "$path" "$BACKUP_DIR/$path"
@@ -189,7 +209,7 @@ SQL
 }
 
 stop_panel_for_db_migration() {
-  log "Stopping panel services before DB enum migration"
+  log "Stopping panel services before DB migration"
 
   systemctl stop hiddify-panel-background-tasks 2>/dev/null || true
   systemctl stop hiddify-panel 2>/dev/null || true
@@ -228,6 +248,82 @@ update_mysql_enums() {
 
   alter_enum_add_values "$db" "bool_config" "${BOOL_KEYS[@]}"
   alter_enum_add_values "$db" "str_config" "${STR_KEYS[@]}"
+}
+
+create_custom_rule_table() {
+  if ! command -v mysql >/dev/null 2>&1; then
+    log "mysql command not found, skipping custom rule table creation"
+    return 0
+  fi
+
+  local db
+  db="$(detect_mysql_db)"
+
+  log "Creating commercial_routing_custom_rule table if missing"
+
+  mysql "$db" <<'SQL'
+CREATE TABLE IF NOT EXISTS commercial_routing_custom_rule (
+  id INT NOT NULL AUTO_INCREMENT,
+  rule_type VARCHAR(32) NOT NULL,
+  value TEXT NOT NULL,
+  normalized_value TEXT NOT NULL,
+  outbound_policy VARCHAR(32) NOT NULL DEFAULT 'direct_ru',
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  comment TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY ix_commercial_routing_custom_rule_rule_type (rule_type),
+  KEY ix_commercial_routing_custom_rule_enabled (enabled),
+  UNIQUE KEY uq_commercial_routing_rule_unique (rule_type, normalized_value(255))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL
+}
+
+seed_commercial_defaults() {
+  if ! command -v mysql >/dev/null 2>&1; then
+    log "mysql command not found, skipping commercial defaults"
+    return 0
+  fi
+
+  local db
+  db="$(detect_mysql_db)"
+
+  log "Seeding commercial routing default settings"
+
+  mysql "$db" <<'SQL'
+INSERT INTO bool_config (child_id, `key`, value) VALUES
+(0, 'commercial_routing_enable', 0),
+(0, 'commercial_apply_to_xray', 1),
+(0, 'commercial_apply_to_singbox', 1),
+(0, 'commercial_ru_geoip_enabled', 1)
+ON DUPLICATE KEY UPDATE
+  value = CASE
+    WHEN `key`='commercial_routing_enable' THEN value
+    ELSE VALUES(value)
+  END;
+
+INSERT INTO str_config (child_id, `key`, value) VALUES
+(0, 'commercial_router_host', '127.0.0.1'),
+(0, 'commercial_router_port', '20808'),
+(0, 'commercial_router_protocol', 'socks5'),
+(0, 'commercial_domestic_policy', 'send_to_router'),
+(0, 'commercial_udp443_policy', 'keep_block'),
+(0, 'commercial_ru_domain_suffixes', '.ru,.su,.xn--p1ai'),
+(0, 'commercial_default_global_policy', 'to_de'),
+(0, 'commercial_router_core_type', 'xray'),
+(0, 'commercial_de_tunnel_type', 'test_blackhole'),
+(0, 'commercial_de_endpoint', ''),
+(0, 'commercial_de_public_key', ''),
+(0, 'commercial_de_private_key_ref', ''),
+(0, 'commercial_de_vless_uri', ''),
+(0, 'commercial_de_trojan_uri', '')
+ON DUPLICATE KEY UPDATE
+  value = CASE
+    WHEN value IS NULL OR value='' THEN VALUES(value)
+    ELSE value
+  END;
+SQL
 }
 
 copy_overlays() {
@@ -322,6 +418,10 @@ compile_python() {
 }
 
 write_xray_router_test_blackhole() {
+  local xray_bin
+  xray_bin="$(find_xray_bin)"
+
+  log "Using xray binary: $xray_bin"
   log "Writing xray-router test_blackhole config"
 
   mkdir -p /etc/xray-router
@@ -394,13 +494,13 @@ write_xray_router_test_blackhole() {
 }
 JSON
 
-  xray run -test -config /etc/xray-router/config.json
+  "$xray_bin" run -test -config /etc/xray-router/config.json
 
   if [[ -f /etc/systemd/system/xray-router.service ]]; then
     backup_file /etc/systemd/system/xray-router.service
   fi
 
-  cat > /etc/systemd/system/xray-router.service <<'EOF'
+  cat > /etc/systemd/system/xray-router.service <<EOF
 [Unit]
 Description=Xray Router Core for Commercial Routing
 After=network-online.target
@@ -410,7 +510,7 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/local/bin/xray run -config /etc/xray-router/config.json
+ExecStart=${xray_bin} run -config /etc/xray-router/config.json
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -440,6 +540,8 @@ main() {
 
   copy_overlays "$src_root"
   update_mysql_enums
+  create_custom_rule_table
+  seed_commercial_defaults
   compile_python
   copy_runtime_site_packages
 
@@ -454,6 +556,7 @@ main() {
   log "Done"
   log "Backup dir: $BACKUP_DIR"
   log "Routing is not automatically enabled in Hiddify settings."
+  log "Default to-de mode is test_blackhole until you set commercial_de_vless_uri or commercial_de_trojan_uri."
 }
 
 main "$@"
