@@ -15,7 +15,7 @@ from hiddifypanel.database import db, db_execute
 
 
 from loguru import logger
-MAX_DB_VERSION = 135
+MAX_DB_VERSION = 136
 _BOOTSTRAP_DOMAIN_FALLBACKS = [
     "fa.wikipedia.org",
     "en.wikipedia.org",
@@ -283,6 +283,29 @@ def _v134(child_id):
         ConfigEnum.telegram_subscription_expiry_reminder_message,
         "У вас заканчивается подписка через {days_left} дн. Не забудьте продлить тариф.",
     )
+
+
+def _v136(child_id):
+    from hiddifypanel.models.commercial_routing_custom_rule import CommercialRoutingCustomRule
+    CommercialRoutingCustomRule.__table__.create(bind=db.engine, checkfirst=True)
+    add_config_if_not_exist(ConfigEnum.commercial_routing_enable, False)
+    add_config_if_not_exist(ConfigEnum.commercial_router_host, "127.0.0.1")
+    add_config_if_not_exist(ConfigEnum.commercial_router_port, "20808")
+    add_config_if_not_exist(ConfigEnum.commercial_router_protocol, "socks5")
+    add_config_if_not_exist(ConfigEnum.commercial_apply_to_xray, True)
+    add_config_if_not_exist(ConfigEnum.commercial_apply_to_singbox, True)
+    add_config_if_not_exist(ConfigEnum.commercial_domestic_policy, "keep_hiddify")
+    add_config_if_not_exist(ConfigEnum.commercial_udp443_policy, "keep_block")
+    add_config_if_not_exist(ConfigEnum.commercial_ru_domain_suffixes, ".ru,.su,.xn--p1ai")
+    add_config_if_not_exist(ConfigEnum.commercial_ru_geoip_enabled, True)
+    add_config_if_not_exist(ConfigEnum.commercial_default_global_policy, "to_de")
+    add_config_if_not_exist(ConfigEnum.commercial_router_core_type, "xray")
+    add_config_if_not_exist(ConfigEnum.commercial_de_tunnel_type, "test_blackhole")
+    add_config_if_not_exist(ConfigEnum.commercial_de_endpoint, "")
+    add_config_if_not_exist(ConfigEnum.commercial_de_public_key, "")
+    add_config_if_not_exist(ConfigEnum.commercial_de_private_key_ref, "")
+    add_config_if_not_exist(ConfigEnum.commercial_de_vless_uri, "")
+    add_config_if_not_exist(ConfigEnum.commercial_de_trojan_uri, "")
 
 
 def _v111(child_id):
@@ -996,7 +1019,7 @@ def add_config_if_not_exist(key: "ConfigEnum", val: str | int, child_id: int | N
 
     old_val = hconfig(key, child_id)
     if old_val is None:
-        set_hconfig(key, val)
+        set_hconfig(key, val, child_id=child_id)
 
 
 def add_column(column):

@@ -2,6 +2,9 @@ import datetime
 import uuid
 import json
 import os
+import shutil
+from pathlib import Path
+import subprocess
 import click
 from dateutil import relativedelta
 
@@ -9,6 +12,9 @@ from dateutil import relativedelta
 from hiddifypanel import hutils
 
 from hiddifypanel.models import *
+from hiddifypanel.models.commercial_routing_custom_rule import CommercialRoutingCustomRule
+from hiddifypanel.hutils import commercial_routing
+from hiddifypanel.hutils.proxy import router_core
 from hiddifypanel.panel import hiddify, usage
 from hiddifypanel.database import db
 from hiddifypanel.panel.init_db import init_db
@@ -111,6 +117,7 @@ def tuic_domain_port():
 def init_app(app):
     for command in [hysteria_domain_port, tuic_domain_port, init_db, drop_db, all_configs, update_usage, admin_links, admin_path, backup, downgrade]:
         app.cli.add_command(app.cli.command()(command))
+    init_commercial_routing_cli(app)
 
     @ app.cli.command()
     @ click.option("--domain", "-d")
@@ -235,3 +242,84 @@ def init_app(app):
             'webhook': hook_info
         }
         print(json.dumps(output, indent=4))
+
+
+
+def _load_hconfigs_from_db():
+    return get_hconfigs()
+
+
+def _load_enabled_custom_rules():
+    return commercial_routing.load_enabled_custom_rules()
+
+
+def _xray_binary():
+    return shutil.which('xray') or '/usr/local/bin/xray'
+
+
+def _write_json(path: Path, data: dict):
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+
+
+def init_commercial_routing_cli(app):
+    @app.cli.group('commercial-routing')
+    def commercial_routing_group():
+        """Commercial routing control commands."""
+
+    @commercial_routing_group.command('preview')
+    def commercial_routing_preview():
+        hconfigs = _load_hconfigs_from_db()
+        custom_rules = _load_enabled_custom_rules()
+        rendered = router_core.render_desired_config(hconfigs, custom_rules)
+        print(json.dumps(rendered.config, indent=2, ensure_ascii=False))
+
+    @commercial_routing_group.command('test-route')
+    @click.argument('input_value')
+    def commercial_routing_test_route(input_value):
+        hconfigs = _load_hconfigs_from_db()
+        custom_rules = _load_enabled_custom_rules()
+        result = commercial_routing.simulate_route_match(input_value, hconfigs, custom_rules)
+        print(json.dumps(result.__dict__, indent=2, ensure_ascii=False))
+
+    @commercial_routing_group.command('add-custom-rule')
+    @click.option('--rule-type', required=True)
+    @click.option('--value', required=True)
+    @click.option('--comment', default='')
+    def commercial_routing_add_custom_rule(rule_type, value, comment):
+        ok, normalized, err = commercial_routing.validate_custom_rule(rule_type, value)
+        if not ok:
+            raise click.ClickException(err or 'invalid rule')
+        exists = CommercialRoutingCustomRule.query.filter_by(rule_type=rule_type, normalized_value=normalized).first()
+        if exists:
+            print(f'Rule already exists: {rule_type} {normalized}')
+            return
+        db.session.add(CommercialRoutingCustomRule(rule_type=rule_type, value=value, normalized_value=normalized, outbound_policy='direct_ru', enabled=True, comment=comment))
+        db.session.commit()
+        print(f'Added rule: {rule_type} {normalized}')
+
+    @commercial_routing_group.command('apply')
+    def commercial_routing_apply():
+        hconfigs = _load_hconfigs_from_db()
+        custom_rules = _load_enabled_custom_rules()
+        rendered = router_core.render_desired_config(hconfigs, custom_rules)
+        target = Path(rendered.target_path)
+        tmp = Path(str(target) + '.tmp')
+        backup = Path(str(target) + '.bak.' + datetime.datetime.utcnow().strftime('%F_%H-%M-%S'))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _write_json(tmp, rendered.config)
+        test = subprocess.run([_xray_binary(), 'run', '-test', '-config', str(tmp)], capture_output=True, text=True)
+        if test.returncode != 0:
+            if tmp.exists():
+                tmp.unlink()
+            raise click.ClickException((test.stderr or test.stdout).strip() or 'xray config test failed')
+        if target.exists():
+            shutil.copy2(target, backup)
+        os.replace(tmp, target)
+        restart = subprocess.run(['systemctl', 'restart', rendered.service_name], capture_output=True, text=True)
+        active = subprocess.run(['systemctl', 'is-active', rendered.service_name], capture_output=True, text=True)
+        if restart.returncode != 0 or active.stdout.strip() != 'active':
+            if backup.exists():
+                shutil.copy2(backup, target)
+                subprocess.run(['systemctl', 'restart', rendered.service_name], capture_output=True, text=True)
+            raise click.ClickException('router-core restart failed, rollback attempted')
+        print(f'Applied {rendered.target_path} and restarted {rendered.service_name}')

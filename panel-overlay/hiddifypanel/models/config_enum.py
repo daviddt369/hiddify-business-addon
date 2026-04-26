@@ -162,6 +162,26 @@ class ConfigEnum(metaclass=FastEnum):
     telegram_subscription_expiry_reminder_message = _StrConfigDscr(ConfigCategory.telegram, hide_in_virtual_child=True)
     business_enabled = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
 
+    commercial_routing_enable = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_router_host = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_router_port = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_router_protocol = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_apply_to_xray = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_apply_to_singbox = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_domestic_policy = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_udp443_policy = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+
+    commercial_ru_domain_suffixes = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_ru_geoip_enabled = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_default_global_policy = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_router_core_type = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_de_tunnel_type = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_de_endpoint = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_de_public_key = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_de_private_key_ref = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_de_vless_uri = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+    commercial_de_trojan_uri = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
+
     # region child-parent
     # deprecated
     is_parent = _BoolConfigDscr(ConfigCategory.hidden)
