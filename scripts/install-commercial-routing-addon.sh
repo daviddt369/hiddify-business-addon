@@ -5,6 +5,9 @@ REPO_URL="${REPO_URL:-https://github.com/daviddt369/hiddify-business-addon}"
 BRANCH="${BRANCH:-routing_hiddify_addons}"
 HIDDIFY_DIR="${HIDDIFY_DIR:-/opt/hiddify-manager}"
 
+INSTALL_XRAY_ROUTER_TEST="${INSTALL_XRAY_ROUTER_TEST:-0}"
+INSTALL_DB_ENUMS="${INSTALL_DB_ENUMS:-1}"
+
 TS="$(date +%F_%H-%M-%S)"
 TMP_DIR="/tmp/hiddify-commercial-routing-$TS"
 BACKUP_DIR="/root/commercial-routing-install-backups/$TS"
@@ -34,7 +37,7 @@ STR_KEYS=(
 )
 
 log() {
-  echo "[commercial-routing-install] $*"
+  echo "[commercial-routing-install] $*" >&2
 }
 
 fail() {
@@ -73,6 +76,25 @@ copy_overlay_file() {
   cp -a "$src" "$dst"
 }
 
+download_branch() {
+  mkdir -p "$TMP_DIR"
+  cd "$TMP_DIR"
+
+  log "Downloading ${REPO_URL} branch ${BRANCH}"
+
+  curl -fsSL "${REPO_URL}/archive/refs/heads/${BRANCH}.tar.gz" -o addon.tar.gz
+  tar -xzf addon.tar.gz
+
+  local extracted
+  extracted="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+  if [[ -z "$extracted" ]]; then
+    fail "Cannot find extracted addon directory"
+  fi
+
+  echo "$extracted"
+}
+
 detect_mysql_db() {
   local db=""
 
@@ -81,13 +103,24 @@ detect_mysql_db() {
     return 0
   fi
 
-  db="$(mysql -NBe "SHOW DATABASES" 2>/dev/null | grep -E 'hiddify|panel' | head -n 1 || true)"
+  db="$(mysql -NBe "SHOW DATABASES" 2>/dev/null | grep -E '^hiddifypanel$|hiddify|panel' | head -n 1 || true)"
 
   if [[ -z "$db" ]]; then
     fail "Cannot detect MySQL database. Run with MYSQL_DB=your_db_name"
   fi
 
   echo "$db"
+}
+
+kill_old_enum_queries() {
+  log "Killing old hanging ENUM ALTER queries if any"
+
+  mysql -NBe "SHOW FULL PROCESSLIST" | awk '/ALTER TABLE.*(bool_config|str_config).*MODIFY COLUMN.*key/ {print $1}' | while read -r id; do
+    if [[ -n "$id" ]]; then
+      log "KILL MySQL query id $id"
+      mysql -e "KILL $id;" || true
+    fi
+  done
 }
 
 alter_enum_add_values() {
@@ -120,21 +153,66 @@ inner = current_type[len("enum("):-1]
 reader = csv.reader([inner], quotechar="'", escapechar="\\")
 values = next(reader)
 
+changed = False
 for value in to_add:
     if value not in values:
         values.append(value)
+        changed = True
 
 def q(v):
     return "'" + v.replace("\\", "\\\\").replace("'", "''") + "'"
 
-print("enum(" + ",".join(q(v) for v in values) + ")")
+if changed:
+    print("enum(" + ",".join(q(v) for v in values) + ")")
+else:
+    print("")
 PY
 )"
 
-  mysql "$db" -e "ALTER TABLE \`${table}\` MODIFY COLUMN \`key\` ${enum_sql} NOT NULL;"
+  if [[ -z "$enum_sql" ]]; then
+    log "No ENUM changes needed for ${table}"
+    return 0
+  fi
+
+  log "Altering ${db}.${table}.key ENUM"
+
+  local sql_file
+  sql_file="$(mktemp)"
+
+  cat > "$sql_file" <<SQL
+SET SESSION lock_wait_timeout=30;
+ALTER TABLE \`${table}\` MODIFY COLUMN \`key\` ${enum_sql} NOT NULL;
+SQL
+
+  timeout 120 mysql "$db" < "$sql_file"
+  rm -f "$sql_file"
+}
+
+stop_panel_for_db_migration() {
+  log "Stopping panel services before DB enum migration"
+
+  systemctl stop hiddify-panel-background-tasks 2>/dev/null || true
+  systemctl stop hiddify-panel 2>/dev/null || true
+
+  sleep 2
+}
+
+start_panel_services() {
+  log "Starting panel services"
+
+  systemctl restart hiddify-panel || true
+  systemctl restart hiddify-panel-background-tasks || true
+
+  systemctl status hiddify-panel --no-pager || true
+  systemctl status hiddify-panel-background-tasks --no-pager || true
 }
 
 update_mysql_enums() {
+  if [[ "$INSTALL_DB_ENUMS" != "1" ]]; then
+    log "Skipping MySQL ENUM update because INSTALL_DB_ENUMS=$INSTALL_DB_ENUMS"
+    return 0
+  fi
+
   if ! command -v mysql >/dev/null 2>&1; then
     log "mysql command not found, skipping ENUM update"
     return 0
@@ -145,27 +223,11 @@ update_mysql_enums() {
 
   log "Detected MySQL database: $db"
 
+  stop_panel_for_db_migration
+  kill_old_enum_queries
+
   alter_enum_add_values "$db" "bool_config" "${BOOL_KEYS[@]}"
   alter_enum_add_values "$db" "str_config" "${STR_KEYS[@]}"
-}
-
-download_branch() {
-  mkdir -p "$TMP_DIR"
-  cd "$TMP_DIR"
-
-  log "Downloading ${REPO_URL} branch ${BRANCH}"
-
-  curl -fsSL "${REPO_URL}/archive/refs/heads/${BRANCH}.tar.gz" -o addon.tar.gz
-  tar -xzf addon.tar.gz
-
-  local extracted
-  extracted="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-
-  if [[ -z "$extracted" ]]; then
-    fail "Cannot find extracted addon directory"
-  fi
-
-  echo "$extracted"
 }
 
 copy_overlays() {
@@ -363,22 +425,13 @@ EOF
   systemctl status xray-router --no-pager || true
 }
 
-restart_panel_only() {
-  log "Restarting panel services"
-
-  systemctl restart hiddify-panel || true
-  systemctl restart hiddify-panel-background-tasks || true
-
-  systemctl status hiddify-panel --no-pager || true
-  systemctl status hiddify-panel-background-tasks --no-pager || true
-}
-
 main() {
   need_root
   need_cmd curl
   need_cmd tar
   need_cmd rsync
   need_cmd python3
+  need_cmd timeout
 
   [[ -d "$HIDDIFY_DIR" ]] || fail "Hiddify dir not found: $HIDDIFY_DIR"
 
@@ -390,18 +443,17 @@ main() {
   compile_python
   copy_runtime_site_packages
 
-  if [[ "${INSTALL_XRAY_ROUTER_TEST:-0}" == "1" ]]; then
+  if [[ "$INSTALL_XRAY_ROUTER_TEST" == "1" ]]; then
     write_xray_router_test_blackhole
   else
     log "Skipping xray-router system install. To enable test router, rerun with INSTALL_XRAY_ROUTER_TEST=1"
   fi
 
-  restart_panel_only
+  start_panel_services
 
   log "Done"
   log "Backup dir: $BACKUP_DIR"
   log "Routing is not automatically enabled in Hiddify settings."
-  log "For DE-training PoC use commercial_de_tunnel_type=test_blackhole."
 }
 
 main "$@"
