@@ -107,6 +107,30 @@ sync_manager_overlay() {
         "$INSTALL_DIR/stable_beta10/install-commercial.sh"
 }
 
+sync_proxy_overlays() {
+    local stamp="$1"
+    local repo_root="$TMP_ROOT/addon"
+
+    mkdir -p "$INSTALL_DIR/xray/configs"
+    mkdir -p "$INSTALL_DIR/singbox/configs"
+
+    if [[ -d "$repo_root/manager-overlay/xray/configs" ]]; then
+        while IFS= read -r -d '' file; do
+            local rel="${file#$repo_root/manager-overlay/xray/configs/}"
+            backup_target "$INSTALL_DIR/xray/configs/$rel" "$stamp"
+        done < <(find "$repo_root/manager-overlay/xray/configs" -type f -print0)
+        rsync -a "$repo_root/manager-overlay/xray/configs/" "$INSTALL_DIR/xray/configs/"
+    fi
+
+    if [[ -d "$repo_root/manager-overlay/singbox/configs" ]]; then
+        while IFS= read -r -d '' file; do
+            local rel="${file#$repo_root/manager-overlay/singbox/configs/}"
+            backup_target "$INSTALL_DIR/singbox/configs/$rel" "$stamp"
+        done < <(find "$repo_root/manager-overlay/singbox/configs" -type f -print0)
+        rsync -a "$repo_root/manager-overlay/singbox/configs/" "$INSTALL_DIR/singbox/configs/"
+    fi
+}
+
 sync_panel_overlay() {
     local stamp="$1"
     local repo_root="$TMP_ROOT/addon"
@@ -183,6 +207,7 @@ main() {
     clone_addon_repo
     commit_sha="$(resolve_commit_sha)"
     sync_manager_overlay "$stamp"
+    sync_proxy_overlays "$stamp"
     sync_panel_overlay "$stamp"
     write_manifest "$stamp" "$commit_sha"
 

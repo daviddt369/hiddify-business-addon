@@ -8,11 +8,11 @@ from loguru import logger
 
 XRAY_ACCESS_LOG = os.environ.get(
     "HIDDIFY_XRAY_ACCESS_LOG",
-    "/opt/hiddify-manager/log/system/xray.access.log",
+    "/opt/hiddify-manager/hiddify-panel/var/xray.access.log",
 )
 XRAY_ACCESS_STATE = os.environ.get(
     "HIDDIFY_XRAY_ACCESS_STATE",
-    "/opt/hiddify-manager/log/system/xray.access.state.json",
+    "/opt/hiddify-manager/hiddify-panel/var/xray.access.state.json",
 )
 ACCESS_TTL_SECONDS = int(os.environ.get("HIDDIFY_CONNECTED_IP_TTL", "120"))
 

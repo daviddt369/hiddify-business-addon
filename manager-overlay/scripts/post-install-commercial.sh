@@ -239,6 +239,16 @@ EnvironmentFile=$SECRETS_FILE
 EOF
 }
 
+prepare_xray_access_log() {
+    local panel_var_dir="$INSTALL_DIR/hiddify-panel/var"
+    local access_log_path="$panel_var_dir/xray.access.log"
+
+    install -d -o hiddify-panel -g hiddify-panel -m 750 "$panel_var_dir"
+    touch "$access_log_path"
+    chown hiddify-panel:hiddify-panel "$access_log_path"
+    chmod 664 "$access_log_path"
+}
+
 configure_panel() {
     ensure_config_schema
     upsert_bool_config "business_enabled" 1
@@ -323,6 +333,7 @@ main() {
     ensure_existing_secret_values
     write_secrets_env
     write_systemd_overrides
+    prepare_xray_access_log
     ensure_haproxy_runtime
     configure_panel
     restart_services

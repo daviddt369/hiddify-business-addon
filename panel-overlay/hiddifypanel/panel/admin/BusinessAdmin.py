@@ -16,6 +16,48 @@ from hiddifypanel.panel import hiddify
 from hiddifypanel.panel.commercial.telegrambot.secrets import telegram_bot_token, telegram_payment_provider_token
 from hiddifypanel.hutils import commercial_routing
 
+# BEGIN COMMERCIAL ROUTING EDITABLE UI CONFIG
+COMMERCIAL_ROUTING_DIRECT_DNS_KEY = "commercial_direct_dns_servers"
+COMMERCIAL_ROUTING_PROXY_DNS_KEY = "commercial_proxy_dns_servers"
+COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY = "commercial_blocked_domains"
+COMMERCIAL_ROUTING_UI_PRIMARY_PATH = commercial_routing.COMMERCIAL_ROUTING_UI_PRIMARY_PATH
+COMMERCIAL_ROUTING_UI_LEGACY_PATH = commercial_routing.COMMERCIAL_ROUTING_UI_LEGACY_PATH
+
+DEFAULT_COMMERCIAL_ROUTING_DIRECT_DNS = "77.88.8.8\n77.88.8.1"
+DEFAULT_COMMERCIAL_ROUTING_PROXY_DNS = "1.1.1.1\n1.0.0.1\n8.8.8.8\n8.8.4.4"
+DEFAULT_COMMERCIAL_ROUTING_BLOCKED_DOMAINS = "gosuslugi.ru\ngslb.gosuslugi.ru\ngu-st.ru\nnalog.ru\nnalog.gov.ru"
+
+
+def _commercial_routing_config_text(key, default):
+    try:
+        from pathlib import Path
+
+        routing_ui_paths = tuple(Path(p) for p in commercial_routing.commercial_routing_ui_read_paths())
+
+        for routing_ui_path in routing_ui_paths:
+            if not routing_ui_path.exists():
+                continue
+
+            try:
+                data = json.loads(routing_ui_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+
+            if not isinstance(data, dict):
+                continue
+
+            value = data.get(key)
+            value = "" if value is None else str(value)
+            value = value.replace("\r\n", "\n").replace("\r", "\n")
+
+            if value.strip():
+                return value
+    except Exception:
+        pass
+
+    return default
+# END COMMERCIAL ROUTING EDITABLE UI CONFIG
+
 
 class BusinessSettingsForm(FlaskForm):
     telegram_bot_token = wtf.StringField(_("Токен Telegram бота"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^([0-9]{8,12}:[a-zA-Z0-9_-]{30,40})$", re.IGNORECASE, _("config.Invalid_telegram_bot_token"))], description=_("Токен из @BotFather для работы коммерческого Telegram-бота."), render_kw={"class": "ltr", "placeholder": "123456789:AA..."})
@@ -47,6 +89,28 @@ class BusinessSettingsForm(FlaskForm):
     commercial_de_vless_uri = wtf.TextAreaField("DE VLESS URI", render_kw={"rows": 3})
     commercial_de_trojan_uri = wtf.TextAreaField("DE Trojan URI", render_kw={"rows": 3})
 
+
+    # BEGIN COMMERCIAL ROUTING EDITABLE UI FIELDS
+    commercial_blocked_domains = wtf.TextAreaField(
+        "Blocked sensitive domains",
+        validators=[wtf.validators.Optional()],
+        description="Домены для blackhole. Один домен на строку. Можно писать gosuslugi.ru или domain:gosuslugi.ru.",
+        render_kw={"rows": 6},
+    )
+    commercial_direct_dns_servers = wtf.TextAreaField(
+        "Direct DNS servers",
+        validators=[wtf.validators.Optional()],
+        description="DNS для RU/direct маршрута. Один IP на строку.",
+        render_kw={"rows": 4},
+    )
+    commercial_proxy_dns_servers = wtf.TextAreaField(
+        "Proxy / Global DNS servers",
+        validators=[wtf.validators.Optional()],
+        description="DNS для global/to-de маршрута. Один IP на строку.",
+        render_kw={"rows": 4},
+    )
+    # END COMMERCIAL ROUTING EDITABLE UI FIELDS
+
     custom_ru_rules_bulk = wtf.TextAreaField("Custom RU rules bulk import", render_kw={"rows": 6})
     test_route_input = wtf.StringField("Test route input")
     submit = wtf.SubmitField(_("Сохранить"))
@@ -56,7 +120,7 @@ class BusinessAdmin(FlaskView):
     decorators = [login_required(roles={Role.super_admin})]
 
     def _build_form(self):
-        return BusinessSettingsForm(
+        form = BusinessSettingsForm(
             telegram_bot_token=telegram_bot_token(),
             telegram_webhook_domain=hconfig(ConfigEnum.telegram_webhook_domain) or "",
             telegram_payment_provider_token=telegram_payment_provider_token(),
@@ -83,7 +147,12 @@ class BusinessAdmin(FlaskView):
             commercial_de_private_key_ref=hconfig(ConfigEnum.commercial_de_private_key_ref) or "",
             commercial_de_vless_uri=hconfig(ConfigEnum.commercial_de_vless_uri) or "",
             commercial_de_trojan_uri=hconfig(ConfigEnum.commercial_de_trojan_uri) or "",
+            commercial_blocked_domains=_commercial_routing_config_text(COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY, DEFAULT_COMMERCIAL_ROUTING_BLOCKED_DOMAINS),
+            commercial_direct_dns_servers=_commercial_routing_config_text(COMMERCIAL_ROUTING_DIRECT_DNS_KEY, DEFAULT_COMMERCIAL_ROUTING_DIRECT_DNS),
+            commercial_proxy_dns_servers=_commercial_routing_config_text(COMMERCIAL_ROUTING_PROXY_DNS_KEY, DEFAULT_COMMERCIAL_ROUTING_PROXY_DNS),
         )
+        form.custom_ru_rules_bulk.data = commercial_routing.custom_rules_to_bulk_text(commercial_routing.load_enabled_custom_rules())
+        return form
 
     def index(self):
         form = self._build_form()
@@ -137,40 +206,121 @@ class BusinessAdmin(FlaskView):
             ConfigEnum.commercial_de_private_key_ref: (form.commercial_de_private_key_ref.data or "").strip(),
             ConfigEnum.commercial_de_vless_uri: (form.commercial_de_vless_uri.data or "").strip(),
             ConfigEnum.commercial_de_trojan_uri: (form.commercial_de_trojan_uri.data or "").strip(),
+            COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY: (form.commercial_blocked_domains.data or "").strip(),
+            COMMERCIAL_ROUTING_DIRECT_DNS_KEY: (form.commercial_direct_dns_servers.data or "").strip(),
+            COMMERCIAL_ROUTING_PROXY_DNS_KEY: (form.commercial_proxy_dns_servers.data or "").strip(),
         }
+
+        # BEGIN HIDDIFY ROUTING UI JSON SAVE
+        routing_ui_submitted = {}
+        for _routing_ui_key in (
+            COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY,
+            COMMERCIAL_ROUTING_DIRECT_DNS_KEY,
+            COMMERCIAL_ROUTING_PROXY_DNS_KEY,
+        ):
+            if _routing_ui_key in submitted:
+                routing_ui_submitted[_routing_ui_key] = submitted.pop(_routing_ui_key)
 
         for key, value in submitted.items():
             if old_configs.get(key) != value:
                 set_hconfig(key, value, commit=False)
 
+        if routing_ui_submitted:
+            from pathlib import Path
+            import json
+
+            # Stage A1 keeps panel behavior unchanged: write primary JSON first,
+            # then mirror the same payload to the legacy /etc path used by runtime apply.
+            primary_routing_ui_path = Path(COMMERCIAL_ROUTING_UI_PRIMARY_PATH)
+            legacy_routing_ui_path = Path(COMMERCIAL_ROUTING_UI_LEGACY_PATH)
+
+            primary_routing_ui_path.parent.mkdir(parents=True, exist_ok=True)
+
+            current_routing_ui = {}
+            for _candidate_path in (primary_routing_ui_path, legacy_routing_ui_path):
+                try:
+                    if _candidate_path.exists():
+                        _loaded = json.loads(_candidate_path.read_text(encoding="utf-8"))
+                        if isinstance(_loaded, dict):
+                            current_routing_ui = _loaded
+                            break
+                except Exception:
+                    pass
+
+            for _routing_ui_key, _routing_ui_value in routing_ui_submitted.items():
+                current_routing_ui[str(_routing_ui_key)] = "" if _routing_ui_value is None else str(_routing_ui_value)
+
+            _serialized_routing_ui = json.dumps(current_routing_ui, indent=2, ensure_ascii=False) + "\n"
+
+            primary_routing_ui_path.write_text(_serialized_routing_ui, encoding="utf-8")
+
+            try:
+                legacy_routing_ui_path.parent.mkdir(parents=True, exist_ok=True)
+                legacy_routing_ui_path.write_text(_serialized_routing_ui, encoding="utf-8")
+            except Exception:
+                pass
+        # END HIDDIFY ROUTING UI JSON SAVE
+
         bulk_text = (form.custom_ru_rules_bulk.data or "").strip()
         if bulk_text:
             rules, errors = commercial_routing.parse_bulk_rules(bulk_text)
-            if errors:
-                for err in errors:
-                    hutils.flask.flash(f"Bulk rule line {err.line_no}: {err.error}", "danger")
-                return render_template(
-                    "business-settings.html",
-                    form=form,
-                    commercial_routing_preview=commercial_routing.build_preview(get_hconfigs(), commercial_routing.load_enabled_custom_rules()),
-                    custom_rules=commercial_routing.load_enabled_custom_rules(),
-                    test_result=None,
-                    commercial_routing_notice=None,
-                )
-            for rule in rules:
-                exists = CommercialRoutingCustomRule.query.filter_by(rule_type=rule["rule_type"], normalized_value=rule["normalized_value"]).first()
-                if exists:
-                    continue
-                db.session.add(CommercialRoutingCustomRule(**rule))
+        else:
+            rules, errors = [], []
+
+        if errors:
+            for err in errors:
+                hutils.flask.flash(f"Bulk rule line {err.line_no}: {err.error}", "danger")
+            return render_template(
+                "business-settings.html",
+                form=form,
+                commercial_routing_preview=commercial_routing.build_preview(get_hconfigs(), commercial_routing.load_enabled_custom_rules()),
+                custom_rules=commercial_routing.load_enabled_custom_rules(),
+                test_result=None,
+                commercial_routing_notice=None,
+            )
+
+        unique_rules = {}
+        for rule in rules:
+            unique_rules[(rule["rule_type"], rule["normalized_value"])] = rule
+
+        CommercialRoutingCustomRule.query.delete()
+        for rule in unique_rules.values():
+            db.session.add(CommercialRoutingCustomRule(**rule))
 
         db.session.commit()
 
-        from hiddifypanel.panel.commercial.telegrambot import register_bot
-        register_bot(set_hook=True)
+        commercial_routing_notice = None
+        try:
+            import subprocess
+            apply_proc = subprocess.run(
+                ["sudo", "-n", "/opt/hiddify-manager/common/commander.py", "commercial-routing-apply"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+            )
+            if apply_proc.returncode == 0:
+                commercial_routing_notice = "Router-core config применён, xray-router перезапущен."
+                hutils.flask.flash(commercial_routing_notice, "success")
+            else:
+                msg = ((apply_proc.stderr or "") + "\n" + (apply_proc.stdout or "")).strip()
+                commercial_routing_notice = "Настройки сохранены, но router-core config не применён: " + (msg[-1000:] if msg else "unknown error")
+                hutils.flask.flash(commercial_routing_notice, "danger")
+        except Exception as exc:
+            commercial_routing_notice = f"Настройки сохранены, но router-core config не применён: {exc}"
+            hutils.flask.flash(commercial_routing_notice, "danger")
+
+        telegram_related_keys = {
+            ConfigEnum.telegram_bot_token,
+            ConfigEnum.telegram_webhook_domain,
+            ConfigEnum.telegram_payment_provider_token,
+        }
+        if any(old_configs.get(k) != submitted.get(k) for k in telegram_related_keys):
+            from hiddifypanel.panel.commercial.telegrambot import register_bot
+            register_bot(set_hook=True)
 
         reset_action = hiddify.check_need_reset(old_configs)
         hutils.flask.flash(_("config.configs_have_been_updated"), "success")
-        notice = "Настройки сохранены, но router-core config не применён. Запустите commercial-routing apply."
+        notice = commercial_routing_notice or "Настройки сохранены, но router-core config не применён. Запустите commercial-routing apply."
         if reset_action:
             return reset_action
         return render_template(

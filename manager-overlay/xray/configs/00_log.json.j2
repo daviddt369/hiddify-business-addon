@@ -1,0 +1,13 @@
+{
+        "log": {
+                "loglevel": "{{hconfigs['log_level'].lower()}}",
+                {%if hconfigs['log_level']=="CRITICAL"%}
+                        "output": "none",
+                        "error": "none",
+                        "dnsLog": false,
+                {%endif%}
+                "access": "/opt/hiddify-manager/hiddify-panel/var/xray.access.log",
+                "logid": true,
+                "header": true,
+        }
+}
