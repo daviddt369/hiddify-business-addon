@@ -19,6 +19,8 @@ BOOL_KEYS=(
   commercial_apply_to_xray
   commercial_apply_to_singbox
   commercial_ru_geoip_enabled
+  commercial_drop_bittorrent
+  commercial_legacy_geosite_to_router
 )
 
 STR_KEYS=(
@@ -317,7 +319,9 @@ INSERT INTO bool_config (child_id, `key`, value) VALUES
 (0, 'commercial_routing_enable', 0),
 (0, 'commercial_apply_to_xray', 1),
 (0, 'commercial_apply_to_singbox', 1),
-(0, 'commercial_ru_geoip_enabled', 1)
+(0, 'commercial_ru_geoip_enabled', 1),
+(0, 'commercial_drop_bittorrent', 1),
+(0, 'commercial_legacy_geosite_to_router', 1)
 ON DUPLICATE KEY UPDATE
   value = CASE
     WHEN `key`='commercial_routing_enable' THEN value

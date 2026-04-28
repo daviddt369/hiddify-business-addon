@@ -227,8 +227,9 @@ def build_preview(hconfigs: dict[str, Any], custom_rules: list[dict[str, Any]]) 
         "custom_rules_total": len(custom_rules),
         "builtin_ru_suffixes": parse_builtin_suffixes(_cfg(hconfigs, ConfigEnum.commercial_ru_domain_suffixes, "")),
         "geoip_enabled": bool(_cfg(hconfigs, ConfigEnum.commercial_ru_geoip_enabled)),
-        "apply_required": True,
-        "apply_notice": "Настройки сохранены, но router-core config не применён. Запустите commercial-routing apply.",
+        # apply result is shown via UI flashes from BusinessAdmin.post
+        "apply_required": False,
+        "apply_notice": "",
     }
 
 
