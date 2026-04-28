@@ -4,6 +4,8 @@ set -Eeuo pipefail
 REPO_URL="${REPO_URL:-https://github.com/daviddt369/hiddify-business-addon}"
 BRANCH="${BRANCH:-routing_hiddify_addons}"
 HIDDIFY_DIR="${HIDDIFY_DIR:-/opt/hiddify-manager}"
+HIDDIFY_BASE_VERSION_REGEX="${HIDDIFY_BASE_VERSION_REGEX:-^12\\.0\\.}"
+ALLOW_UNSUPPORTED_BASE_VERSION="${ALLOW_UNSUPPORTED_BASE_VERSION:-0}"
 
 INSTALL_XRAY_ROUTER_TEST="${INSTALL_XRAY_ROUTER_TEST:-0}"
 INSTALL_DB_ENUMS="${INSTALL_DB_ENUMS:-1}"
@@ -53,6 +55,25 @@ need_root() {
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+check_supported_base_version() {
+  local version_file="$HIDDIFY_DIR/VERSION"
+  [[ -f "$version_file" ]] || fail "Cannot find $version_file"
+
+  local version
+  version="$(tr -d '\r\n' < "$version_file")"
+  if [[ "$version" =~ $HIDDIFY_BASE_VERSION_REGEX ]]; then
+    log "Detected supported Hiddify base version: $version"
+    return 0
+  fi
+
+  if [[ "$ALLOW_UNSUPPORTED_BASE_VERSION" == "1" ]]; then
+    log "WARNING: base version '$version' does not match '$HIDDIFY_BASE_VERSION_REGEX', continuing because ALLOW_UNSUPPORTED_BASE_VERSION=1"
+    return 0
+  fi
+
+  fail "Unsupported base Hiddify version: $version. Expected regex '$HIDDIFY_BASE_VERSION_REGEX' (default 12.0.*). Set ALLOW_UNSUPPORTED_BASE_VERSION=1 to override."
 }
 
 find_xray_bin() {
@@ -530,6 +551,7 @@ EOF
 
 main() {
   need_root
+  check_supported_base_version
   need_cmd curl
   need_cmd tar
   need_cmd rsync

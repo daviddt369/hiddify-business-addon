@@ -6,6 +6,8 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/hiddify-manager}"
 ADDON_REPO="${ADDON_REPO:-https://github.com/daviddt369/hiddify-business-addon.git}"
 ADDON_REF="${ADDON_REF:-$SCRIPT_VERSION}"
 ALLOW_UNPINNED="${ALLOW_UNPINNED:-0}"
+HIDDIFY_BASE_VERSION_REGEX="${HIDDIFY_BASE_VERSION_REGEX:-^12\\.0\\.}"
+ALLOW_UNSUPPORTED_BASE_VERSION="${ALLOW_UNSUPPORTED_BASE_VERSION:-0}"
 TMP_ROOT="${TMP_ROOT:-/tmp/hiddify-business-addon}"
 MANIFEST_PATH="${MANIFEST_PATH:-$INSTALL_DIR/business-addon.manifest}"
 
@@ -39,14 +41,17 @@ require_base_install() {
 check_supported_version() {
     local version
     version="$(tr -d '\r\n' < "$INSTALL_DIR/VERSION")"
-    case "$version" in
-        12.*)
-            log "Найдена поддерживаемая версия Hiddify: $version"
-            ;;
-        *)
-            die "Неподдерживаемая версия Hiddify: $version. Поддерживается только ветка 12.x"
-            ;;
-    esac
+    if [[ "$version" =~ $HIDDIFY_BASE_VERSION_REGEX ]]; then
+        log "Найдена поддерживаемая версия Hiddify: $version"
+        return 0
+    fi
+
+    if [[ "$ALLOW_UNSUPPORTED_BASE_VERSION" == "1" ]]; then
+        log "ВНИМАНИЕ: базовая версия '$version' не совпадает с regex '$HIDDIFY_BASE_VERSION_REGEX', но продолжаем из-за ALLOW_UNSUPPORTED_BASE_VERSION=1"
+        return 0
+    fi
+
+    die "Неподдерживаемая базовая версия Hiddify: $version. Ожидается regex '$HIDDIFY_BASE_VERSION_REGEX' (по умолчанию 12.0.*). Для принудительного запуска укажи ALLOW_UNSUPPORTED_BASE_VERSION=1"
 }
 
 validate_addon_ref() {
@@ -169,6 +174,7 @@ INSTALL_TIMESTAMP=$stamp
 SCRIPT_VERSION=$SCRIPT_VERSION
 ADDON_REPO=$ADDON_REPO
 ADDON_REF=$ADDON_REF
+HIDDIFY_BASE_VERSION_REGEX=$HIDDIFY_BASE_VERSION_REGEX
 ADDON_COMMIT_SHA=$commit_sha
 INSTALL_DIR=$INSTALL_DIR
 EOF
