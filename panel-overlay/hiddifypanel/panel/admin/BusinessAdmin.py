@@ -1,5 +1,6 @@
 import json
 import re
+from urllib.parse import urlencode
 
 import wtforms as wtf
 from flask import redirect, render_template, request
@@ -119,6 +120,55 @@ class BusinessSettingsForm(FlaskForm):
 class BusinessAdmin(FlaskView):
     decorators = [login_required(roles={Role.super_admin})]
 
+    @staticmethod
+    def _routing_available(hconfigs=None):
+        hconfigs = hconfigs or get_hconfigs()
+        return bool(
+            hconfigs.get(ConfigEnum.commercial_router_core_type)
+            or hconfigs.get(ConfigEnum.commercial_router_host)
+            or hconfigs.get(ConfigEnum.commercial_router_port)
+        )
+
+    def _active_section(self, hconfigs=None):
+        section = (request.args.get("section") or request.form.get("section") or "telegram").strip().lower()
+        if section == "routing" and not self._routing_available(hconfigs):
+            return "telegram"
+        return section if section in {"telegram", "routing"} else "telegram"
+
+    @staticmethod
+    def _routing_summary(preview):
+        preview = preview or {}
+        builtin_suffixes = [str(item).strip() for item in (preview.get("builtin_ru_suffixes") or []) if str(item).strip()]
+        return {
+            "apply_notice": str(preview.get("apply_notice") or "").strip(),
+            "apply_required": bool(preview.get("apply_required")),
+            "builtin_ru_suffixes": builtin_suffixes,
+            "custom_rules_total": int(preview.get("custom_rules_total") or 0),
+            "geoip_enabled": bool(preview.get("geoip_enabled")),
+            "layer1_enabled": bool(preview.get("layer1_enabled")),
+            "router_core_type": str(preview.get("router_core_type") or "xray"),
+            "router_target": str(preview.get("router_target") or "/etc/xray-router/config.json"),
+        }
+
+    def _render_settings(self, form, commercial_routing_notice=None, test_result=None):
+        hconfigs = get_hconfigs()
+        custom_rules = commercial_routing.load_enabled_custom_rules()
+        preview = commercial_routing.build_preview(hconfigs, custom_rules)
+        routing_available = self._routing_available(hconfigs)
+        return render_template(
+            "business-settings.html",
+            form=form,
+            custom_rules=custom_rules,
+            commercial_routing_preview=preview,
+            commercial_routing_summary=self._routing_summary(preview),
+            test_result=test_result,
+            commercial_routing_notice=commercial_routing_notice,
+            active_section=self._active_section(hconfigs),
+            routing_available=routing_available,
+            routing_section_url=f"{request.path}?{urlencode({'section': 'routing'})}",
+            telegram_section_url=f"{request.path}?{urlencode({'section': 'telegram'})}",
+        )
+
     def _build_form(self):
         form = BusinessSettingsForm(
             telegram_bot_token=telegram_bot_token(),
@@ -156,19 +206,17 @@ class BusinessAdmin(FlaskView):
 
     def index(self):
         form = self._build_form()
-        custom_rules = commercial_routing.load_enabled_custom_rules()
-        preview = commercial_routing.build_preview(get_hconfigs(), custom_rules)
         test_result = None
         if request.args.get("test_route"):
-            test_result = commercial_routing.simulate_route_match(request.args.get("test_route"), get_hconfigs(), custom_rules)
-        return render_template("business-settings.html", form=form, commercial_routing_preview=preview, custom_rules=custom_rules, test_result=test_result, commercial_routing_notice=None)
+            test_result = commercial_routing.simulate_route_match(request.args.get("test_route"), get_hconfigs(), commercial_routing.load_enabled_custom_rules())
+        return self._render_settings(form, commercial_routing_notice=None, test_result=test_result)
 
     def post(self):
         form = BusinessSettingsForm()
         old_configs = get_hconfigs()
         if not form.validate_on_submit():
             hutils.flask.flash(_("config.validation-error"), "danger")
-            return render_template("business-settings.html", form=form, commercial_routing_preview=commercial_routing.build_preview(get_hconfigs(), commercial_routing.load_enabled_custom_rules()), custom_rules=commercial_routing.load_enabled_custom_rules(), test_result=None, commercial_routing_notice=None)
+            return self._render_settings(form, commercial_routing_notice=None, test_result=None)
 
         if (form.commercial_router_port.data or "").strip():
             try:
@@ -177,7 +225,7 @@ class BusinessAdmin(FlaskView):
                     raise ValueError
             except Exception:
                 hutils.flask.flash("Invalid commercial router port", "danger")
-                return render_template("business-settings.html", form=form, commercial_routing_preview=commercial_routing.build_preview(get_hconfigs(), commercial_routing.load_enabled_custom_rules()), custom_rules=commercial_routing.load_enabled_custom_rules(), test_result=None, commercial_routing_notice=None)
+                return self._render_settings(form, commercial_routing_notice=None, test_result=None)
 
         submitted = {
             ConfigEnum.telegram_bot_token: (form.telegram_bot_token.data or "").strip(),
@@ -270,14 +318,7 @@ class BusinessAdmin(FlaskView):
         if errors:
             for err in errors:
                 hutils.flask.flash(f"Bulk rule line {err.line_no}: {err.error}", "danger")
-            return render_template(
-                "business-settings.html",
-                form=form,
-                commercial_routing_preview=commercial_routing.build_preview(get_hconfigs(), commercial_routing.load_enabled_custom_rules()),
-                custom_rules=commercial_routing.load_enabled_custom_rules(),
-                test_result=None,
-                commercial_routing_notice=None,
-            )
+            return self._render_settings(form, commercial_routing_notice=None, test_result=None)
 
         unique_rules = {}
         for rule in rules:
@@ -323,11 +364,8 @@ class BusinessAdmin(FlaskView):
         notice = commercial_routing_notice or "Настройки сохранены, но router-core config не применён. Запустите commercial-routing apply."
         if reset_action:
             return reset_action
-        return render_template(
-            "business-settings.html",
-            form=self._build_form(),
-            commercial_routing_preview=commercial_routing.build_preview(get_hconfigs(), commercial_routing.load_enabled_custom_rules()),
-            custom_rules=commercial_routing.load_enabled_custom_rules(),
-            test_result=commercial_routing.simulate_route_match((form.test_route_input.data or "").strip(), get_hconfigs(), commercial_routing.load_enabled_custom_rules()) if (form.test_route_input.data or "").strip() else None,
+        return self._render_settings(
+            self._build_form(),
             commercial_routing_notice=notice,
+            test_result=commercial_routing.simulate_route_match((form.test_route_input.data or "").strip(), get_hconfigs(), commercial_routing.load_enabled_custom_rules()) if (form.test_route_input.data or "").strip() else None,
         )

@@ -215,8 +215,18 @@
         <div class="nav-item" id="business-sidebar">
           {{ render_nav_item('flask.plans.index_view',
           icon('solid','credit-card','nav-icon')+'Тарифы',_use_li=True) }}
-          {{ render_nav_item('admin.BusinessAdmin:index',
-          icon('brands','telegram','nav-icon')+'Telegram / YooKassa',_use_li=True) }}
+          <li class="nav-item">
+            <a class="nav-link{% if request.endpoint == 'admin.BusinessAdmin:index' and (request.args.get('section') or 'telegram') == 'telegram' %} active{% endif %}" href="{{ hurl_for('admin.BusinessAdmin:index') }}?section=telegram">
+              {{ icon('brands','telegram','nav-icon') }}Telegram / YooKassa
+            </a>
+          </li>
+          {% if hconfig(ConfigEnum.commercial_router_core_type) or hconfig(ConfigEnum.commercial_router_host) %}
+          <li class="nav-item">
+            <a class="nav-link{% if request.endpoint == 'admin.BusinessAdmin:index' and request.args.get('section') == 'routing' %} active{% endif %}" href="{{ hurl_for('admin.BusinessAdmin:index') }}?section=routing">
+              {{ icon('solid','route','nav-icon') }}Роутинг
+            </a>
+          </li>
+          {% endif %}
         </div>
         {% endif %}
       </ul>

@@ -8,17 +8,31 @@
     <div class="container-fluid">
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">Бизнес: Telegram, YooKassa и Commercial Routing</h3>
+          <h3 class="card-title">Бизнес - {{ "Роутинг" if active_section == "routing" else "Telegram и YooKassa" }}</h3>
         </div>
         <div class="card-body">
           {% if commercial_routing_notice %}
           <div class="alert alert-warning">{{ commercial_routing_notice }}</div>
           {% endif %}
 
+          <ul class="nav nav-pills mb-4">
+            <li class="nav-item">
+              <a class="nav-link{% if active_section == 'telegram' %} active{% endif %}" href="{{ telegram_section_url }}">Telegram / YooKassa</a>
+            </li>
+            {% if routing_available %}
+            <li class="nav-item">
+              <a class="nav-link{% if active_section == 'routing' %} active{% endif %}" href="{{ routing_section_url }}">Роутинг</a>
+            </li>
+            {% endif %}
+          </ul>
+
           <form method="post" action="{{ request.path }}">
             {{ form.hidden_tag() }}
+            <input type="hidden" name="section" value="{{ active_section }}">
 
-            <h4>Telegram / Payments</h4>
+            {% if active_section == "telegram" %}
+            <h4>Telegram / YooKassa</h4>
+            <p class="text-muted">Здесь настраиваются бот, webhook, платежи и пользовательские тексты.{% if routing_available %} Роутинг вынесен в отдельный раздел.{% else %} Пункт «Роутинг» появится после установки routing-addon.{% endif %}</p>
             <div class="form-group"><label for="{{ form.telegram_bot_token.id }}">{{ form.telegram_bot_token.label.text }}</label>{{ form.telegram_bot_token(class_="form-control") }}<small class="form-text text-muted">{{ form.telegram_bot_token.description }}</small></div>
             <div class="form-group"><label for="{{ form.telegram_webhook_domain.id }}">{{ form.telegram_webhook_domain.label.text }}</label>{{ form.telegram_webhook_domain(class_="form-control") }}<small class="form-text text-muted">{{ form.telegram_webhook_domain.description }}</small></div>
             <div class="form-group"><label for="{{ form.telegram_payment_provider_token.id }}">{{ form.telegram_payment_provider_token.label.text }}</label>{{ form.telegram_payment_provider_token(class_="form-control") }}<small class="form-text text-muted">{{ form.telegram_payment_provider_token.description }}</small></div>
@@ -27,58 +41,85 @@
             <div class="form-group"><label for="{{ form.telegram_welcome_message.id }}">{{ form.telegram_welcome_message.label.text }}</label>{{ form.telegram_welcome_message(class_="form-control") }}<small class="form-text text-muted">{{ form.telegram_welcome_message.description }}</small></div>
             <div class="form-group"><label for="{{ form.telegram_subscription_expiry_reminder_days.id }}">{{ form.telegram_subscription_expiry_reminder_days.label.text }}</label>{{ form.telegram_subscription_expiry_reminder_days(class_="form-control") }}<small class="form-text text-muted">{{ form.telegram_subscription_expiry_reminder_days.description }}</small></div>
             <div class="form-group"><label for="{{ form.telegram_subscription_expiry_reminder_message.id }}">{{ form.telegram_subscription_expiry_reminder_message.label.text }}</label>{{ form.telegram_subscription_expiry_reminder_message(class_="form-control") }}<small class="form-text text-muted">{{ form.telegram_subscription_expiry_reminder_message.description }}</small></div>
+            {% else %}
 
             <hr>
-            <h4>Hiddify Redirect Settings</h4>
-            <div class="alert alert-info">Для полного split-routing нужно применять настройку и к Xray, и к sing-box. Иначе часть протоколов продолжит выходить напрямую.</div>
-            <div class="alert alert-warning">UDP/QUIC зависит от udp443_policy. По умолчанию Hiddify может блокировать UDP/443.</div>
-            <div class="form-group form-check">{{ form.commercial_routing_enable(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_routing_enable.id }}">Enable commercial routing redirect</label></div>
-            <div class="form-group"><label for="{{ form.commercial_router_host.id }}">Router host</label>{{ form.commercial_router_host(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_router_port.id }}">Router port</label>{{ form.commercial_router_port(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_router_protocol.id }}">Router protocol</label>{{ form.commercial_router_protocol(class_="form-control") }}</div>
-            <div class="form-group form-check">{{ form.commercial_apply_to_xray(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_apply_to_xray.id }}">Apply to Xray</label></div>
-            <div class="form-group form-check">{{ form.commercial_apply_to_singbox(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_apply_to_singbox.id }}">Apply to sing-box</label></div>
-            <div class="form-group"><label for="{{ form.commercial_domestic_policy.id }}">Domestic policy</label>{{ form.commercial_domestic_policy(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_udp443_policy.id }}">UDP/443 policy</label>{{ form.commercial_udp443_policy(class_="form-control") }}</div>
+            <h4>Маршрутизация</h4>
+            <div class="alert alert-info">Внешняя нода = upstream / global. В вашем случае это может быть DE, но настройки не привязаны к конкретной стране.</div>
+            <div class="alert alert-info">Для полного split-routing настройку нужно применять и к Xray, и к sing-box. Иначе часть протоколов продолжит выходить напрямую.</div>
+            <div class="alert alert-warning">UDP/443 управляет QUIC/HTTP3. Блокировка обычно делает маршрутизацию предсказуемее и заставляет клиентов перейти на TCP/443.</div>
+            <div class="form-group form-check">{{ form.commercial_routing_enable(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_routing_enable.id }}">Включить коммерческую маршрутизацию</label></div>
+            <div class="form-group"><label for="{{ form.commercial_router_host.id }}">Локальный router-core</label>{{ form.commercial_router_host(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_router_port.id }}">Порт router-core</label>{{ form.commercial_router_port(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_router_protocol.id }}">Протокол подключения к router-core</label>{{ form.commercial_router_protocol(class_="form-control") }}</div>
+            <div class="form-group form-check">{{ form.commercial_apply_to_xray(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_apply_to_xray.id }}">Применять к Xray</label></div>
+            <div class="form-group form-check">{{ form.commercial_apply_to_singbox(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_apply_to_singbox.id }}">Применять к sing-box</label></div>
+            <div class="form-group"><label for="{{ form.commercial_domestic_policy.id }}">Что делать с внутренним трафиком</label>{{ form.commercial_domestic_policy(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_udp443_policy.id }}">Политика UDP/443 (QUIC)</label>{{ form.commercial_udp443_policy(class_="form-control") }}</div>
 
             <hr>
-            <h4>Router-Core Policy Settings</h4>
-            <div class="alert alert-info">Custom RU rules are applied only in second router-core.</div>
-            <div class="form-group"><label for="{{ form.commercial_ru_domain_suffixes.id }}">Builtin RU suffixes</label>{{ form.commercial_ru_domain_suffixes(class_="form-control") }}</div>
-            <div class="form-group form-check">{{ form.commercial_ru_geoip_enabled(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_ru_geoip_enabled.id }}">Enable geoip:ru</label></div>
-            <div class="form-group"><label for="{{ form.commercial_default_global_policy.id }}">Default global policy</label>{{ form.commercial_default_global_policy(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_router_core_type.id }}">Router-core type</label>{{ form.commercial_router_core_type(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_de_tunnel_type.id }}">DE tunnel type</label>{{ form.commercial_de_tunnel_type(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_de_endpoint.id }}">DE endpoint</label>{{ form.commercial_de_endpoint(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_de_public_key.id }}">DE public key</label>{{ form.commercial_de_public_key(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_de_private_key_ref.id }}">DE private key ref</label>{{ form.commercial_de_private_key_ref(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_de_vless_uri.id }}">DE VLESS URI</label>{{ form.commercial_de_vless_uri(class_="form-control") }}</div>
-            <div class="form-group"><label for="{{ form.commercial_de_trojan_uri.id }}">DE Trojan URI</label>{{ form.commercial_de_trojan_uri(class_="form-control") }}</div>
+            <h4>Политика router-core</h4>
+            <div class="alert alert-info">Пользовательские RU-правила применяются только во втором router-core. Добавлять их в шаблоны Hiddify не нужно.</div>
+            <div class="form-group"><label for="{{ form.commercial_ru_domain_suffixes.id }}">Встроенные RU-суффиксы</label>{{ form.commercial_ru_domain_suffixes(class_="form-control") }}<small class="form-text text-muted">Оставляйте здесь только базовые суффиксы: .ru, .su, .xn--p1ai. Пользовательские домены добавляйте ниже, в список правил.</small></div>
+            <div class="form-group form-check">{{ form.commercial_ru_geoip_enabled(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_ru_geoip_enabled.id }}">Включить geoip:ru</label></div>
+            <div class="form-group"><label for="{{ form.commercial_default_global_policy.id }}">Куда отправлять весь не-RU трафик</label>{{ form.commercial_default_global_policy(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_router_core_type.id }}">Движок маршрутизации</label>{{ form.commercial_router_core_type(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_de_tunnel_type.id }}">Тип туннеля до внешней ноды</label>{{ form.commercial_de_tunnel_type(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_de_endpoint.id }}">Endpoint внешней ноды</label>{{ form.commercial_de_endpoint(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_de_public_key.id }}">Public key внешней ноды</label>{{ form.commercial_de_public_key(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_de_private_key_ref.id }}">Private key reference</label>{{ form.commercial_de_private_key_ref(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_de_vless_uri.id }}">VLESS URI внешней ноды</label>{{ form.commercial_de_vless_uri(class_="form-control") }}</div>
+            <div class="form-group"><label for="{{ form.commercial_de_trojan_uri.id }}">Trojan URI внешней ноды</label>{{ form.commercial_de_trojan_uri(class_="form-control") }}</div>
 
             <hr>
-            <h4>Custom RU rules</h4>
-            <p class="text-muted">Bulk import format: domain:example.ru / suffix:.example.ru / wildcard:*.example.ru / regex:.*\.example\.ru$ / ip:1.2.3.4 / cidr:1.2.3.0/24</p>
-            <div class="form-group"><label for="{{ form.custom_ru_rules_bulk.id }}">Bulk import</label>{{ form.custom_ru_rules_bulk(class_="form-control") }}</div>
-            {% if custom_rules %}
-            <ul>
-              {% for rule in custom_rules %}
-              <li><code>{{ rule.rule_type }}</code> {{ rule.normalized_value }}{% if rule.comment %} — {{ rule.comment }}{% endif %}</li>
-              {% endfor %}
+            <h4>Пользовательские RU-маршруты</h4>
+            <p class="text-muted">Эти правила отправляют выбранные домены и IP напрямую через RU-ноду. Всё, что не попадает под эти правила, .ru/.su/.xn--p1ai и geoip:ru, уходит через внешнюю ноду.</p>
+            <p class="text-muted mb-2">Формат ввода:</p>
+            <ul class="text-muted">
+              <li><code>domain:example.com</code> - только конкретный домен</li>
+              <li><code>suffix:example.com</code> - домен и все поддомены</li>
+              <li><code>wildcard:*.example.com</code> - wildcard-маска</li>
+              <li><code>regex:.*\\.example\\.com$</code> - регулярное выражение</li>
+              <li><code>ip:1.2.3.4</code> - один IP</li>
+              <li><code>cidr:1.2.3.0/24</code> - подсеть</li>
             </ul>
-            {% else %}
-            <p class="text-muted">No custom RU rules configured.</p>
-            {% endif %}
+            <div class="form-group"><label for="{{ form.custom_ru_rules_bulk.id }}">Список правил</label>{{ form.custom_ru_rules_bulk(class_="form-control") }}</div>
+            <p class="text-muted">Сейчас сохранено правил: <strong>{{ commercial_routing_summary.custom_rules_total }}</strong>.</p>
 
             <hr>
-            <h4>Preview</h4>
-            <pre>{{ commercial_routing_preview | tojson(indent=2) }}</pre>
+            <h4>Заблокированные чувствительные домены</h4>
+            <p class="text-muted">Эти домены не маршрутизируются, а дропаются через blackhole, чтобы не светить IP нод.</p>
+            <div class="form-group"><label for="{{ form.commercial_blocked_domains.id }}">Список доменов для блокировки</label>{{ form.commercial_blocked_domains(class_="form-control") }}<small class="form-text text-muted">{{ form.commercial_blocked_domains.description }}</small></div>
 
-            <h4>Test route simulation</h4>
-            <div class="form-group"><label for="{{ form.test_route_input.id }}">Input</label>{{ form.test_route_input(class_="form-control") }}</div>
-            {% if test_result %}
-            <pre>{{ test_result.__dict__ | tojson(indent=2) }}</pre>
-            {% else %}
-            <p class="text-muted">GeoIP match is not simulated in UI; requires runtime router test.</p>
+            <div class="row">
+              <div class="col-lg-6">
+                <h4>DNS для direct-RU</h4>
+                <div class="form-group"><label for="{{ form.commercial_direct_dns_servers.id }}">Direct DNS servers</label>{{ form.commercial_direct_dns_servers(class_="form-control") }}<small class="form-text text-muted">{{ form.commercial_direct_dns_servers.description }}</small></div>
+              </div>
+              <div class="col-lg-6">
+                <h4>DNS для внешней ноды</h4>
+                <div class="form-group"><label for="{{ form.commercial_proxy_dns_servers.id }}">Proxy / Global DNS servers</label>{{ form.commercial_proxy_dns_servers(class_="form-control") }}<small class="form-text text-muted">{{ form.commercial_proxy_dns_servers.description }}</small></div>
+              </div>
+            </div>
+
+            <hr>
+            <h4>Сводка конфигурации</h4>
+            {% if commercial_routing_summary.apply_required %}
+            <div class="alert alert-warning">{{ commercial_routing_summary.apply_notice or "Настройки сохранены, но router-core config ещё не применён." }}</div>
+            {% endif %}
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <tbody>
+                  <tr><th style="width: 260px;">Встроенные RU-суффиксы</th><td>{{ commercial_routing_summary.builtin_ru_suffixes | join(', ') if commercial_routing_summary.builtin_ru_suffixes else 'не заданы' }}</td></tr>
+                  <tr><th>Количество пользовательских правил</th><td>{{ commercial_routing_summary.custom_rules_total }}</td></tr>
+                  <tr><th>GeoIP RU</th><td>{{ 'включён' if commercial_routing_summary.geoip_enabled else 'выключен' }}</td></tr>
+                  <tr><th>Layer 1 redirect</th><td>{{ 'включён' if commercial_routing_summary.layer1_enabled else 'выключен' }}</td></tr>
+                  <tr><th>Router core</th><td>{{ commercial_routing_summary.router_core_type }}</td></tr>
+                  <tr><th>Target config</th><td><code>{{ commercial_routing_summary.router_target }}</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-muted mb-0">GeoIP в UI не симулируется. Для реальной проверки маршрута нужен runtime-тест через router-core.</p>
             {% endif %}
 
             <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>

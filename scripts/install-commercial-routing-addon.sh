@@ -343,6 +343,9 @@ copy_overlays() {
   copy_overlay_file "$src_root/panel-overlay/hiddifypanel/panel/admin/BusinessAdmin.py" \
     "$HIDDIFY_DIR/hiddify-panel/src/hiddifypanel/panel/admin/BusinessAdmin.py"
 
+  copy_overlay_file "$src_root/panel-overlay/hiddifypanel/templates/admin-layout.html" \
+    "$HIDDIFY_DIR/hiddify-panel/src/hiddifypanel/templates/admin-layout.html"
+
   copy_overlay_file "$src_root/panel-overlay/hiddifypanel/panel/cli.py" \
     "$HIDDIFY_DIR/hiddify-panel/src/hiddifypanel/panel/cli.py"
 
