@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/daviddt369/hiddify-business-addon}"
-BRANCH="${BRANCH:-routing_hiddify_addons}"
+REPO_REF="${REPO_REF:-${BRANCH:-routing_hiddify_addons}}"
+REPO_REF_KIND="${REPO_REF_KIND:-branch}" # branch|tag
 HIDDIFY_DIR="${HIDDIFY_DIR:-/opt/hiddify-manager}"
 HIDDIFY_BASE_VERSION_REGEX="${HIDDIFY_BASE_VERSION_REGEX:-^12\\.0\\.}"
 ALLOW_UNSUPPORTED_BASE_VERSION="${ALLOW_UNSUPPORTED_BASE_VERSION:-0}"
@@ -119,13 +120,19 @@ copy_overlay_file() {
   cp -a "$src" "$dst"
 }
 
-download_branch() {
+download_source() {
   mkdir -p "$TMP_DIR"
   cd "$TMP_DIR"
 
-  log "Downloading ${REPO_URL} branch ${BRANCH}"
+  local archive_url=""
+  if [[ "$REPO_REF_KIND" == "tag" ]]; then
+    archive_url="${REPO_URL}/archive/refs/tags/${REPO_REF}.tar.gz"
+  else
+    archive_url="${REPO_URL}/archive/refs/heads/${REPO_REF}.tar.gz"
+  fi
 
-  curl -fsSL "${REPO_URL}/archive/refs/heads/${BRANCH}.tar.gz" -o addon.tar.gz
+  log "Downloading ${archive_url}"
+  curl -fsSL "${archive_url}" -o addon.tar.gz
   tar -xzf addon.tar.gz
 
   local extracted
@@ -565,7 +572,7 @@ main() {
   [[ -d "$HIDDIFY_DIR" ]] || fail "Hiddify dir not found: $HIDDIFY_DIR"
 
   local src_root
-  src_root="$(download_branch)"
+  src_root="$(download_source)"
 
   copy_overlays "$src_root"
   update_mysql_enums

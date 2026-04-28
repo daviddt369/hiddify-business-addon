@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Stage 1: install official Hiddify 12.0.x base.
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/scripts/install-base-onecmd.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.1/scripts/install-base-onecmd.sh)
 
 BASE_INSTALL_URL="${BASE_INSTALL_URL:-https://raw.githubusercontent.com/hiddify/hiddify-manager/v12.0.0/install.sh}"
 
