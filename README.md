@@ -1,72 +1,66 @@
 # Hiddify Business Addon
 
-Этот репозиторий содержит только нашу надстройку над `official Hiddify`.
+Production addon для установки поверх stable Hiddify `12.0.x`.
 
-Текущий pinned release для установки:
+Текущий релиз:
+- `v0.12.0`
 
-- `v0.2.4`
+## Быстрый порядок установки
 
-Базовый принцип:
+1. Base Hiddify
+2. Commercial addon
+3. Routing addon
+4. Cert scripts (опционально)
 
-1. ставится **официальный Hiddify**
-2. проходится **first setup**
-3. ставится **наш addon**
-4. если используется relay-домен с валидным SSL, выполняется **отдельный шаг relay SSL**
-
-## Шаг 1. База
+## Шаг 1 - Base (Hiddify 12.0.x)
 
 ```bash
-bash <(curl -fsSL https://i.hiddify.com/beta)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/scripts/install-base-onecmd.sh)
 ```
 
-После этого:
-
-- открыть панель
-- завершить `first setup`
+После base:
+- зайти в панель
+- завершить first setup
 - сохранить реальный домен панели
 
-## Шаг 2. Коммерческая надстройка
+## Шаг 2 - Commercial addon
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.4/commercial-addon/install-addon.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/scripts/install-commercial-onecmd.sh)
 ```
 
-Что делает addon:
-
-- накатывает manager overlay
-- накатывает panel overlay
-- запускает интерактивный commercial finalize
-
-## Шаг 3. Relay SSL — только если используется relay-домен
-
-### Стандартный путь: `dns-01`
+## Шаг 3 - Routing addon
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.4/relay-cert/install-dns01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/scripts/install-routing-onecmd.sh)
 ```
 
-### Advanced путь: `http-01` через relay ingress
+## Шаг 4 - Relay cert (опционально)
 
+DNS-01:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.4/relay-cert/install-http01.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/scripts/install-relay-cert-dns01-onecmd.sh)
 ```
 
-Важно:
+HTTP-01:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/scripts/install-relay-cert-http01-onecmd.sh)
+```
 
-- для `http-01` relay должен проксировать `/.well-known/acme-challenge/` на main server
-- точный пример для relay nginx смотри в:
-  - `docs/relay-ssl-ru.md`
-- installer по умолчанию принимает только pinned tag или полный commit SHA
-- для неприбитой установки нужно явно задать:
-  - `ALLOW_UNPINNED=1`
+## Дорожная карта
 
-## Структура
+1. Зафиксировать стабильный baseline на Hiddify `12.0.x` (текущий этап).
+2. Провести аудит совместимости с `12.3.0` без затирания runtime фиксов.
+3. Сделать миграционный релиз с отдельным install path для `12.3.x`.
 
-- `commercial-addon/` — основной addon installer
-- `relay-cert/` — отдельный шаг для relay SSL
-- `manager-overlay/` — manager-side overlay
-- `panel-overlay/` — panel-side overlay
-- `docs/` — русские инструкции
+## Структура репозитория
+
+- `scripts/` - onecmd installers (base/commercial/routing/certs)
+- `commercial-addon/` - installer бизнес-надстройки
+- `relay-cert/` - scripts для relay SSL
+- `manager-overlay/` - manager-side overlay
+- `panel-overlay/` - panel-side overlay
+- `docs/` - документация
 
 ## Документация
 

@@ -9,7 +9,7 @@
 Команда:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.2.4/commercial-addon/install-addon.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.0/commercial-addon/install-addon.sh)
 ```
 
 Что делает installer:
