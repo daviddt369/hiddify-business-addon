@@ -111,12 +111,18 @@
           },
           {% endif %}
         {% endif %}
+        {% if hconfigs.get('commercial_drop_bittorrent', True) %}
+        {
+          "protocol": [
+            "bittorrent"
+          ],
+          "action": "reject",
+          "method": "default"
+        },
+        {% endif %}
         {
           "action": "reject", "ip_is_private": true
         }
-        // {// Block BitTorrent protocol
-        //   "type": "field",  "protocol": ["bittorrent"],"action":"reject","method": "default"
-        // },
       ]
     }
   

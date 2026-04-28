@@ -113,9 +113,11 @@
         {
           "type": "field", "outboundTag": "blackhole", "ip": ["geoip:private"]
         },
+        {% if hconfigs.get('commercial_drop_bittorrent', True) %}
         {// Block BitTorrent protocol
           "type": "field", "outboundTag": "blackhole", "protocol": ["bittorrent"]
         },
+        {% endif %}
         {
           "type": "field",
           "port": "0-65535",

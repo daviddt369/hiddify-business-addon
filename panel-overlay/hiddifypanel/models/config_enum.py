@@ -171,6 +171,7 @@ class ConfigEnum(metaclass=FastEnum):
     commercial_domestic_policy = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
     commercial_udp443_policy = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
     commercial_legacy_geosite_to_router = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
+    commercial_drop_bittorrent = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.apply_config, hide_in_virtual_child=True)
 
     commercial_ru_domain_suffixes = _StrConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)
     commercial_ru_geoip_enabled = _BoolConfigDscr(ConfigCategory.hidden, ApplyMode.nothing, hide_in_virtual_child=True)

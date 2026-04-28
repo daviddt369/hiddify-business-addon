@@ -111,6 +111,7 @@ class BusinessSettingsForm(FlaskForm):
     commercial_domestic_policy = wtf.SelectField("Domestic policy", choices=[("keep_hiddify", "keep_hiddify"), ("send_to_router", "send_to_router"), ("direct_ru", "direct_ru"), ("block", "block")], validate_choice=False)
     commercial_udp443_policy = wtf.SelectField("UDP/443 policy", choices=[("keep_block", "keep_block"), ("allow_to_router", "allow_to_router")], validate_choice=False)
     commercial_legacy_geosite_to_router = wtf.BooleanField("Route legacy geosite block via router-core")
+    commercial_drop_bittorrent = wtf.BooleanField("Drop BitTorrent traffic")
 
     commercial_ru_domain_suffixes = wtf.StringField("Builtin RU suffixes")
     commercial_ru_geoip_enabled = wtf.BooleanField("Enable geoip:ru in router-core")
@@ -221,6 +222,7 @@ class BusinessAdmin(FlaskView):
             commercial_domestic_policy=hconfig(ConfigEnum.commercial_domestic_policy) or "keep_hiddify",
             commercial_udp443_policy=hconfig(ConfigEnum.commercial_udp443_policy) or "keep_block",
             commercial_legacy_geosite_to_router=bool(hconfig(ConfigEnum.commercial_legacy_geosite_to_router)) if hconfig(ConfigEnum.commercial_legacy_geosite_to_router) is not None else True,
+            commercial_drop_bittorrent=bool(hconfig(ConfigEnum.commercial_drop_bittorrent)) if hconfig(ConfigEnum.commercial_drop_bittorrent) is not None else True,
             commercial_ru_domain_suffixes=hconfig(ConfigEnum.commercial_ru_domain_suffixes) or ".ru,.su,.xn--p1ai",
             commercial_ru_geoip_enabled=bool(hconfig(ConfigEnum.commercial_ru_geoip_enabled)),
             commercial_default_global_policy=hconfig(ConfigEnum.commercial_default_global_policy) or "to_de",
@@ -279,6 +281,7 @@ class BusinessAdmin(FlaskView):
             ConfigEnum.commercial_domestic_policy: (form.commercial_domestic_policy.data or "keep_hiddify").strip(),
             ConfigEnum.commercial_udp443_policy: (form.commercial_udp443_policy.data or "keep_block").strip(),
             ConfigEnum.commercial_legacy_geosite_to_router: bool(form.commercial_legacy_geosite_to_router.data),
+            ConfigEnum.commercial_drop_bittorrent: bool(form.commercial_drop_bittorrent.data),
             ConfigEnum.commercial_ru_domain_suffixes: (form.commercial_ru_domain_suffixes.data or "").strip() or ".ru,.su,.xn--p1ai",
             ConfigEnum.commercial_ru_geoip_enabled: bool(form.commercial_ru_geoip_enabled.data),
             ConfigEnum.commercial_default_global_policy: (form.commercial_default_global_policy.data or "to_de").strip(),
@@ -314,6 +317,7 @@ class BusinessAdmin(FlaskView):
             ConfigEnum.commercial_domestic_policy,
             ConfigEnum.commercial_udp443_policy,
             ConfigEnum.commercial_legacy_geosite_to_router,
+            ConfigEnum.commercial_drop_bittorrent,
             ConfigEnum.commercial_ru_domain_suffixes,
             ConfigEnum.commercial_ru_geoip_enabled,
             ConfigEnum.commercial_default_global_policy,

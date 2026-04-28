@@ -297,6 +297,7 @@ def _v136(child_id):
     add_config_if_not_exist(ConfigEnum.commercial_domestic_policy, "keep_hiddify")
     add_config_if_not_exist(ConfigEnum.commercial_udp443_policy, "keep_block")
     add_config_if_not_exist(ConfigEnum.commercial_legacy_geosite_to_router, True)
+    add_config_if_not_exist(ConfigEnum.commercial_drop_bittorrent, True)
     add_config_if_not_exist(ConfigEnum.commercial_ru_domain_suffixes, ".ru,.su,.xn--p1ai")
     add_config_if_not_exist(ConfigEnum.commercial_ru_geoip_enabled, True)
     add_config_if_not_exist(ConfigEnum.commercial_default_global_policy, "to_de")
