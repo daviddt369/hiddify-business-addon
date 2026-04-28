@@ -172,9 +172,9 @@ class BusinessAdmin(FlaskView):
     def _build_form(self):
         form = BusinessSettingsForm(
             telegram_bot_token=telegram_bot_token(),
-            telegram_webhook_domain=hconfig(ConfigEnum.telegram_webhook_domain) or "",
+            telegram_webhook_domain=_telegram_webhook_domain_value() or "",
             telegram_payment_provider_token=telegram_payment_provider_token(),
-            support_url=hconfig(ConfigEnum.support_url) or "",
+            support_url=_support_url_value() or "",
             telegram_instruction_button_text=hconfig(ConfigEnum.telegram_instruction_button_text) or "Инструкция",
             telegram_welcome_message=hconfig(ConfigEnum.telegram_welcome_message) or "",
             telegram_subscription_expiry_reminder_days=hconfig(ConfigEnum.telegram_subscription_expiry_reminder_days) or "2,1",
@@ -258,6 +258,58 @@ class BusinessAdmin(FlaskView):
             COMMERCIAL_ROUTING_DIRECT_DNS_KEY: (form.commercial_direct_dns_servers.data or "").strip(),
             COMMERCIAL_ROUTING_PROXY_DNS_KEY: (form.commercial_proxy_dns_servers.data or "").strip(),
         }
+        active_section = self._active_section(old_configs)
+        telegram_keys = {
+            ConfigEnum.telegram_bot_token,
+            ConfigEnum.telegram_webhook_domain,
+            ConfigEnum.telegram_payment_provider_token,
+            ConfigEnum.support_url,
+            ConfigEnum.telegram_instruction_button_text,
+            ConfigEnum.telegram_welcome_message,
+            ConfigEnum.telegram_subscription_expiry_reminder_days,
+            ConfigEnum.telegram_subscription_expiry_reminder_message,
+        }
+        routing_keys = {
+            ConfigEnum.commercial_routing_enable,
+            ConfigEnum.commercial_router_host,
+            ConfigEnum.commercial_router_port,
+            ConfigEnum.commercial_router_protocol,
+            ConfigEnum.commercial_apply_to_xray,
+            ConfigEnum.commercial_apply_to_singbox,
+            ConfigEnum.commercial_domestic_policy,
+            ConfigEnum.commercial_udp443_policy,
+            ConfigEnum.commercial_ru_domain_suffixes,
+            ConfigEnum.commercial_ru_geoip_enabled,
+            ConfigEnum.commercial_default_global_policy,
+            ConfigEnum.commercial_router_core_type,
+            ConfigEnum.commercial_de_tunnel_type,
+            ConfigEnum.commercial_de_endpoint,
+            ConfigEnum.commercial_de_public_key,
+            ConfigEnum.commercial_de_private_key_ref,
+            ConfigEnum.commercial_de_vless_uri,
+            ConfigEnum.commercial_de_trojan_uri,
+            COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY,
+            COMMERCIAL_ROUTING_DIRECT_DNS_KEY,
+            COMMERCIAL_ROUTING_PROXY_DNS_KEY,
+        }
+
+        if active_section == "telegram":
+            for k in list(routing_keys):
+                submitted.pop(k, None)
+        elif active_section == "routing":
+            for k in list(telegram_keys):
+                submitted.pop(k, None)
+
+
+        # BEGIN HIDDIFY ROUTING UI JSON SAVE
+        routing_ui_submitted = {}
+        for _routing_ui_key in (
+            COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY,
+            COMMERCIAL_ROUTING_DIRECT_DNS_KEY,
+            COMMERCIAL_ROUTING_PROXY_DNS_KEY,
+        ):
+            if _routing_ui_key in submitted:
+                routing_ui_submitted[_routing_ui_key] = submitted.pop(_routing_ui_key)
 
         # BEGIN HIDDIFY ROUTING UI JSON SAVE
         routing_ui_submitted = {}

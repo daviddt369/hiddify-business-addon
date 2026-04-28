@@ -27,6 +27,18 @@ from bleach import clean as bleach_clean, ALLOWED_TAGS as BLEACH_ALLOWED_TAGS
 ALLOWED_TAGS = set([*BLEACH_ALLOWED_TAGS, "h1", "h2", "h3", "h4", "p"])
 
 
+BUSINESS_TELEGRAM_KEYS = {
+    ConfigEnum.telegram_bot_token,
+    ConfigEnum.telegram_webhook_domain,
+    ConfigEnum.telegram_payment_provider_token,
+    ConfigEnum.support_url,
+    ConfigEnum.telegram_instruction_button_text,
+    ConfigEnum.telegram_welcome_message,
+    ConfigEnum.telegram_subscription_expiry_reminder_days,
+    ConfigEnum.telegram_subscription_expiry_reminder_message,
+}
+
+
 def _is_local_sqlite_dev() -> bool:
     return (
         db.engine.dialect.name == "sqlite"
@@ -85,7 +97,7 @@ class SettingAdmin(FlaskView):
             fallback_submitted_configs = {
                 config_key: raw_value
                 for config_key, raw_value in fallback_submitted_configs.items()
-                if config_key not in bool_types
+                if config_key not in bool_types and config_key not in BUSINESS_TELEGRAM_KEYS
             }
 
             for category, c_items in form.data.items():  # [c for c in ConfigEnum]:
@@ -93,6 +105,8 @@ class SettingAdmin(FlaskView):
                 if isinstance(c_items, dict):
                     for k in ConfigEnum:
                         if k.name not in c_items:
+                            continue
+                        if k in BUSINESS_TELEGRAM_KEYS:
                             continue
                         v = c_items[k.name]
                         if k.type == str:
@@ -248,6 +262,8 @@ def get_config_form():
                 csrf = False
             description_for_fieldset = wtf.TextAreaField("", description=_(f'config.{cat}.description'), render_kw={"class": "d-none"})
         for c2 in cat_configs:
+            if c2 in BUSINESS_TELEGRAM_KEYS:
+                continue
             if not (c2 in configs_key):
                 continue
             c = configs_key[c2]

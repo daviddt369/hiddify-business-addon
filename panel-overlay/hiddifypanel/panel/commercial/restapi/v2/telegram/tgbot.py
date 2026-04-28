@@ -1,4 +1,5 @@
 import telebot
+import telebot.apihelper as tg_apihelper
 from flask import request, Response, current_app
 from apiflask import abort
 from apiflask import HTTPError
@@ -40,6 +41,11 @@ class ExceptionHandler(telebot.ExceptionHandler):
 
 bot = telebot.TeleBot("1:2", parse_mode="HTML", threaded=False, exception_handler=ExceptionHandler())
 bot.username = ''
+
+# Improve resiliency for unstable network path to Telegram API.
+tg_apihelper.RETRY_ON_ERROR = True
+tg_apihelper.MAX_RETRIES = 15
+tg_apihelper.RETRY_TIMEOUT = 2
 
 
 def _webhook_secret() -> str:
