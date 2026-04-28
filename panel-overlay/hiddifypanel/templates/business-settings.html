@@ -54,6 +54,9 @@
             <div class="form-group"><label for="{{ form.commercial_router_protocol.id }}">Протокол подключения к router-core</label>{{ form.commercial_router_protocol(class_="form-control") }}</div>
             <div class="form-group form-check">{{ form.commercial_apply_to_xray(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_apply_to_xray.id }}">Применять к Xray</label></div>
             <div class="form-group form-check">{{ form.commercial_apply_to_singbox(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_apply_to_singbox.id }}">Применять к sing-box</label></div>
+            <div class="form-group form-check">{{ form.commercial_legacy_geosite_to_router(class_="form-check-input") }} <label class="form-check-label" for="{{ form.commercial_legacy_geosite_to_router.id }}">Legacy geosite-блок Hiddify отправлять в router-core</label>
+              <small class="form-text text-muted">Если выключено - legacy geosite-правила Hiddify (google/netflix/openai и т.д.) идут по штатной политике Hiddify, без принудительного перевода в router-core.</small>
+            </div>
             <div class="form-group"><label for="{{ form.commercial_domestic_policy.id }}">Что делать с внутренним трафиком</label>{{ form.commercial_domestic_policy(class_="form-control") }}</div>
             <div class="form-group"><label for="{{ form.commercial_udp443_policy.id }}">Политика UDP/443 (QUIC)</label>{{ form.commercial_udp443_policy(class_="form-control") }}</div>
 

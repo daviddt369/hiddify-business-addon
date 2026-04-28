@@ -52,7 +52,7 @@
         },
          {
                 "type":"field",
-                "outboundTag": {% if hconfigs['warp_mode'] == 'disable' %}"freedom"{% else %}"WARP"{% endif %},
+                "outboundTag": {% if hconfigs['commercial_routing_enable'] and hconfigs['commercial_apply_to_xray'] and hconfigs.get('commercial_legacy_geosite_to_router', True) %}"commercial-local-router"{% elif hconfigs['warp_mode'] == 'disable' %}"freedom"{% else %}"WARP"{% endif %},
                 "domain":[
                     "geosite:google",
                     "geosite:netflix",

@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from urllib.parse import urlencode
 
@@ -60,6 +61,37 @@ def _commercial_routing_config_text(key, default):
 # END COMMERCIAL ROUTING EDITABLE UI CONFIG
 
 
+def _secret_file_value(key: str) -> str:
+    try:
+        with open("/etc/hiddify-panel/panel-secrets.env", "r", encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith(f"{key}="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+def _telegram_webhook_domain_value() -> str:
+    value = (hconfig(ConfigEnum.telegram_webhook_domain) or "").strip()
+    if value:
+        return value
+    env_val = (os.environ.get("HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN", "") or os.environ.get("TELEGRAM_WEBHOOK_DOMAIN", "")).strip()
+    if env_val:
+        return env_val
+    return _secret_file_value("HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN")
+
+
+def _support_url_value() -> str:
+    value = (hconfig(ConfigEnum.support_url) or "").strip()
+    if value:
+        return value
+    env_val = (os.environ.get("HIDDIFY_SUPPORT_URL", "") or "").strip()
+    if env_val:
+        return env_val
+    return _secret_file_value("HIDDIFY_SUPPORT_URL")
+
+
 class BusinessSettingsForm(FlaskForm):
     telegram_bot_token = wtf.StringField(_("Токен Telegram бота"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^([0-9]{8,12}:[a-zA-Z0-9_-]{30,40})$", re.IGNORECASE, _("config.Invalid_telegram_bot_token"))], description=_("Токен из @BotFather для работы коммерческого Telegram-бота."), render_kw={"class": "ltr", "placeholder": "123456789:AA..."})
     telegram_webhook_domain = wtf.StringField(_("Домен Telegram webhook"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^([A-Za-z0-9.-]+\.[A-Za-z]{2,})$", re.IGNORECASE, _("config.Invalid_domain"))], description=_("Фиксированный домен для webhook. Если пусто - используется домен панели (полезно для стабильности webhook при нескольких direct-доменах)."), render_kw={"class": "ltr", "placeholder": "tgbot.example.com"})
@@ -73,17 +105,18 @@ class BusinessSettingsForm(FlaskForm):
     commercial_routing_enable = wtf.BooleanField("Enable commercial routing redirect")
     commercial_router_host = wtf.StringField("Commercial router host", validators=[wtf.validators.Optional(), wtf.validators.Length(max=255)])
     commercial_router_port = wtf.StringField("Commercial router port", validators=[wtf.validators.Optional(), wtf.validators.Length(max=8)])
-    commercial_router_protocol = wtf.SelectField("Commercial router protocol", choices=[("socks5", "socks5")])
+    commercial_router_protocol = wtf.SelectField("Commercial router protocol", choices=[("socks5", "socks5")], validate_choice=False)
     commercial_apply_to_xray = wtf.BooleanField("Apply redirect to Xray")
     commercial_apply_to_singbox = wtf.BooleanField("Apply redirect to sing-box")
-    commercial_domestic_policy = wtf.SelectField("Domestic policy", choices=[("keep_hiddify", "keep_hiddify"), ("send_to_router", "send_to_router"), ("direct_ru", "direct_ru"), ("block", "block")])
-    commercial_udp443_policy = wtf.SelectField("UDP/443 policy", choices=[("keep_block", "keep_block"), ("allow_to_router", "allow_to_router")])
+    commercial_domestic_policy = wtf.SelectField("Domestic policy", choices=[("keep_hiddify", "keep_hiddify"), ("send_to_router", "send_to_router"), ("direct_ru", "direct_ru"), ("block", "block")], validate_choice=False)
+    commercial_udp443_policy = wtf.SelectField("UDP/443 policy", choices=[("keep_block", "keep_block"), ("allow_to_router", "allow_to_router")], validate_choice=False)
+    commercial_legacy_geosite_to_router = wtf.BooleanField("Route legacy geosite block via router-core")
 
     commercial_ru_domain_suffixes = wtf.StringField("Builtin RU suffixes")
     commercial_ru_geoip_enabled = wtf.BooleanField("Enable geoip:ru in router-core")
-    commercial_default_global_policy = wtf.SelectField("Default global policy", choices=[("to_de", "to_de")])
-    commercial_router_core_type = wtf.SelectField("Router-core type", choices=[("xray", "xray")])
-    commercial_de_tunnel_type = wtf.SelectField("DE tunnel type", choices=[("test_blackhole", "test_blackhole"), ("vless", "vless"), ("trojan", "trojan"), ("wireguard", "wireguard")])
+    commercial_default_global_policy = wtf.SelectField("Default global policy", choices=[("to_de", "to_de")], validate_choice=False)
+    commercial_router_core_type = wtf.SelectField("Router-core type", choices=[("xray", "xray")], validate_choice=False)
+    commercial_de_tunnel_type = wtf.SelectField("DE tunnel type", choices=[("test_blackhole", "test_blackhole"), ("vless", "vless"), ("trojan", "trojan"), ("wireguard", "wireguard")], validate_choice=False)
     commercial_de_endpoint = wtf.StringField("DE endpoint")
     commercial_de_public_key = wtf.StringField("DE public key")
     commercial_de_private_key_ref = wtf.StringField("DE private key ref")
@@ -187,6 +220,7 @@ class BusinessAdmin(FlaskView):
             commercial_apply_to_singbox=bool(hconfig(ConfigEnum.commercial_apply_to_singbox)),
             commercial_domestic_policy=hconfig(ConfigEnum.commercial_domestic_policy) or "keep_hiddify",
             commercial_udp443_policy=hconfig(ConfigEnum.commercial_udp443_policy) or "keep_block",
+            commercial_legacy_geosite_to_router=bool(hconfig(ConfigEnum.commercial_legacy_geosite_to_router)) if hconfig(ConfigEnum.commercial_legacy_geosite_to_router) is not None else True,
             commercial_ru_domain_suffixes=hconfig(ConfigEnum.commercial_ru_domain_suffixes) or ".ru,.su,.xn--p1ai",
             commercial_ru_geoip_enabled=bool(hconfig(ConfigEnum.commercial_ru_geoip_enabled)),
             commercial_default_global_policy=hconfig(ConfigEnum.commercial_default_global_policy) or "to_de",
@@ -244,6 +278,7 @@ class BusinessAdmin(FlaskView):
             ConfigEnum.commercial_apply_to_singbox: bool(form.commercial_apply_to_singbox.data),
             ConfigEnum.commercial_domestic_policy: (form.commercial_domestic_policy.data or "keep_hiddify").strip(),
             ConfigEnum.commercial_udp443_policy: (form.commercial_udp443_policy.data or "keep_block").strip(),
+            ConfigEnum.commercial_legacy_geosite_to_router: bool(form.commercial_legacy_geosite_to_router.data),
             ConfigEnum.commercial_ru_domain_suffixes: (form.commercial_ru_domain_suffixes.data or "").strip() or ".ru,.su,.xn--p1ai",
             ConfigEnum.commercial_ru_geoip_enabled: bool(form.commercial_ru_geoip_enabled.data),
             ConfigEnum.commercial_default_global_policy: (form.commercial_default_global_policy.data or "to_de").strip(),
@@ -278,6 +313,7 @@ class BusinessAdmin(FlaskView):
             ConfigEnum.commercial_apply_to_singbox,
             ConfigEnum.commercial_domestic_policy,
             ConfigEnum.commercial_udp443_policy,
+            ConfigEnum.commercial_legacy_geosite_to_router,
             ConfigEnum.commercial_ru_domain_suffixes,
             ConfigEnum.commercial_ru_geoip_enabled,
             ConfigEnum.commercial_default_global_policy,
@@ -311,21 +347,11 @@ class BusinessAdmin(FlaskView):
             if _routing_ui_key in submitted:
                 routing_ui_submitted[_routing_ui_key] = submitted.pop(_routing_ui_key)
 
-        # BEGIN HIDDIFY ROUTING UI JSON SAVE
-        routing_ui_submitted = {}
-        for _routing_ui_key in (
-            COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY,
-            COMMERCIAL_ROUTING_DIRECT_DNS_KEY,
-            COMMERCIAL_ROUTING_PROXY_DNS_KEY,
-        ):
-            if _routing_ui_key in submitted:
-                routing_ui_submitted[_routing_ui_key] = submitted.pop(_routing_ui_key)
-
         for key, value in submitted.items():
             if old_configs.get(key) != value:
                 set_hconfig(key, value, commit=False)
 
-        if routing_ui_submitted:
+        if active_section == "routing" and routing_ui_submitted:
             from pathlib import Path
             import json
 
@@ -361,46 +387,49 @@ class BusinessAdmin(FlaskView):
                 pass
         # END HIDDIFY ROUTING UI JSON SAVE
 
-        bulk_text = (form.custom_ru_rules_bulk.data or "").strip()
-        if bulk_text:
-            rules, errors = commercial_routing.parse_bulk_rules(bulk_text)
-        else:
-            rules, errors = [], []
-
-        if errors:
-            for err in errors:
-                hutils.flask.flash(f"Bulk rule line {err.line_no}: {err.error}", "danger")
-            return self._render_settings(form, commercial_routing_notice=None, test_result=None)
-
-        unique_rules = {}
-        for rule in rules:
-            unique_rules[(rule["rule_type"], rule["normalized_value"])] = rule
-
-        CommercialRoutingCustomRule.query.delete()
-        for rule in unique_rules.values():
-            db.session.add(CommercialRoutingCustomRule(**rule))
-
-        db.session.commit()
-
         commercial_routing_notice = None
-        try:
-            import subprocess
-            apply_proc = subprocess.run(
-                ["sudo", "-n", "/opt/hiddify-manager/common/commander.py", "commercial-routing-apply"],
-                capture_output=True,
-                text=True,
-                timeout=90,
-            )
-            if apply_proc.returncode == 0:
-                commercial_routing_notice = "Router-core config применён, xray-router перезапущен."
-                hutils.flask.flash(commercial_routing_notice, "success")
+        if active_section == "routing":
+            bulk_text = (form.custom_ru_rules_bulk.data or "").strip()
+            if bulk_text:
+                rules, errors = commercial_routing.parse_bulk_rules(bulk_text)
             else:
-                msg = ((apply_proc.stderr or "") + "\n" + (apply_proc.stdout or "")).strip()
-                commercial_routing_notice = "Настройки сохранены, но router-core config не применён: " + (msg[-1000:] if msg else "unknown error")
+                rules, errors = [], []
+
+            if errors:
+                for err in errors:
+                    hutils.flask.flash(f"Bulk rule line {err.line_no}: {err.error}", "danger")
+                return self._render_settings(form, commercial_routing_notice=None, test_result=None)
+
+            unique_rules = {}
+            for rule in rules:
+                unique_rules[(rule["rule_type"], rule["normalized_value"])] = rule
+
+            CommercialRoutingCustomRule.query.delete()
+            for rule in unique_rules.values():
+                db.session.add(CommercialRoutingCustomRule(**rule))
+
+            db.session.commit()
+
+            try:
+                import subprocess
+                apply_proc = subprocess.run(
+                    ["sudo", "-n", "/opt/hiddify-manager/common/commander.py", "commercial-routing-apply"],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                )
+                if apply_proc.returncode == 0:
+                    commercial_routing_notice = "Router-core config применён, xray-router перезапущен."
+                    hutils.flask.flash(commercial_routing_notice, "success")
+                else:
+                    msg = ((apply_proc.stderr or "") + "\n" + (apply_proc.stdout or "")).strip()
+                    commercial_routing_notice = "Настройки сохранены, но router-core config не применён: " + (msg[-1000:] if msg else "unknown error")
+                    hutils.flask.flash(commercial_routing_notice, "danger")
+            except Exception as exc:
+                commercial_routing_notice = f"Настройки сохранены, но router-core config не применён: {exc}"
                 hutils.flask.flash(commercial_routing_notice, "danger")
-        except Exception as exc:
-            commercial_routing_notice = f"Настройки сохранены, но router-core config не применён: {exc}"
-            hutils.flask.flash(commercial_routing_notice, "danger")
+        else:
+            db.session.commit()
 
         telegram_related_keys = {
             ConfigEnum.telegram_bot_token,
@@ -413,7 +442,8 @@ class BusinessAdmin(FlaskView):
 
         reset_action = hiddify.check_need_reset(old_configs)
         hutils.flask.flash(_("config.configs_have_been_updated"), "success")
-        notice = commercial_routing_notice or "Настройки сохранены, но router-core config не применён. Запустите commercial-routing apply."
+        default_notice = "Настройки Telegram/YooKassa сохранены." if active_section == "telegram" else "Настройки маршрутизации сохранены."
+        notice = commercial_routing_notice or default_notice
         if reset_action:
             return reset_action
         return self._render_settings(
