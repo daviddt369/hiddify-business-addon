@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Stage 3: install routing addon on top of business addon.
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.1/scripts/install-routing-onecmd.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.4/scripts/install-routing-onecmd.sh)
 
-REPO_REF="${REPO_REF:-v0.12.1}"
+REPO_REF="${REPO_REF:-v0.12.4}"
 REPO_REF_KIND="${REPO_REF_KIND:-tag}" # tag recommended for releases
 HIDDIFY_BASE_VERSION_REGEX="${HIDDIFY_BASE_VERSION_REGEX:-^12\\.0\\.}"
 ALLOW_UNSUPPORTED_BASE_VERSION="${ALLOW_UNSUPPORTED_BASE_VERSION:-0}"

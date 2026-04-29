@@ -46,13 +46,26 @@ prompt_value() {
 
     local answer=""
     if [[ "$secret" == "1" ]]; then
-        read -r -s -p "$prompt_text: " answer
-        echo
+        if [[ -r /dev/tty ]]; then
+            read -r -s -p "$prompt_text: " answer < /dev/tty
+            echo > /dev/tty
+        else
+            read -r -s -p "$prompt_text: " answer
+            echo
+        fi
     elif [[ -n "$default_value" ]]; then
-        read -r -p "$prompt_text [$default_value]: " answer
+        if [[ -r /dev/tty ]]; then
+            read -r -p "$prompt_text [$default_value]: " answer < /dev/tty
+        else
+            read -r -p "$prompt_text [$default_value]: " answer
+        fi
         answer="${answer:-$default_value}"
     else
-        read -r -p "$prompt_text: " answer
+        if [[ -r /dev/tty ]]; then
+            read -r -p "$prompt_text: " answer < /dev/tty
+        else
+            read -r -p "$prompt_text: " answer
+        fi
     fi
 
     printf -v "$var_name" '%s' "$answer"
@@ -69,7 +82,11 @@ prompt_yes_no() {
     fi
 
     local answer=""
-    read -r -p "$prompt_text [$default_value]: " answer
+    if [[ -r /dev/tty ]]; then
+        read -r -p "$prompt_text [$default_value]: " answer < /dev/tty
+    else
+        read -r -p "$prompt_text [$default_value]: " answer
+    fi
     answer="${answer:-$default_value}"
     case "${answer,,}" in
         y|yes|1|true|on) printf -v "$var_name" '%s' "1" ;;
