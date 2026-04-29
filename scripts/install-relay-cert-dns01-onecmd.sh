@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Optional cert stage: relay DNS-01 flow.
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.4/scripts/install-relay-cert-dns01-onecmd.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.5/scripts/install-relay-cert-dns01-onecmd.sh)
 
-ADDON_REF="${ADDON_REF:-v0.12.4}"
+ADDON_REF="${ADDON_REF:-v0.12.5}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root: sudo -i" >&2

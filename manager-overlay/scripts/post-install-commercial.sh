@@ -161,7 +161,9 @@ with app.app_context():
     register_bot(set_hook=True)
     print("webhook_refresh_ok")
 PY
-    chmod 600 "$refresh_script"
+    # Script is created by root; hand it over so the panel user can read it.
+    chown hiddify-panel:hiddify-panel "$refresh_script"
+    chmod 640 "$refresh_script"
     if su hiddify-panel -s /bin/bash -c "set -a; [ -f '$SECRETS_FILE' ] && . '$SECRETS_FILE'; set +a; cd '$INSTALL_DIR/hiddify-panel' && source '$INSTALL_DIR/.venv313/bin/activate' && python3 '$refresh_script'"; then
         :
     else

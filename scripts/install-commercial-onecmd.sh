@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Stage 2: install business addon on top of base 12.0.x.
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.4/scripts/install-commercial-onecmd.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/daviddt369/hiddify-business-addon/v0.12.5/scripts/install-commercial-onecmd.sh)
 
-ADDON_REF="${ADDON_REF:-v0.12.4}"
+ADDON_REF="${ADDON_REF:-v0.12.5}"
 ADDON_REPO="${ADDON_REPO:-https://github.com/daviddt369/hiddify-business-addon.git}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/hiddify-manager}"
 HIDDIFY_BASE_VERSION_REGEX="${HIDDIFY_BASE_VERSION_REGEX:-^12\\.0\\.}"
