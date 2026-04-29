@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from pathlib import Path
 from urllib.parse import urlencode
 
 import wtforms as wtf
@@ -24,6 +25,7 @@ COMMERCIAL_ROUTING_PROXY_DNS_KEY = "commercial_proxy_dns_servers"
 COMMERCIAL_ROUTING_BLOCKED_DOMAINS_KEY = "commercial_blocked_domains"
 COMMERCIAL_ROUTING_UI_PRIMARY_PATH = commercial_routing.COMMERCIAL_ROUTING_UI_PRIMARY_PATH
 COMMERCIAL_ROUTING_UI_LEGACY_PATH = commercial_routing.COMMERCIAL_ROUTING_UI_LEGACY_PATH
+TELEGRAM_UI_SETTINGS_PATH = "/opt/hiddify-manager/hiddify-panel/var/business-telegram-ui.json"
 
 DEFAULT_COMMERCIAL_ROUTING_DIRECT_DNS = "77.88.8.8\n77.88.8.1"
 DEFAULT_COMMERCIAL_ROUTING_PROXY_DNS = "1.1.1.1\n1.0.0.1\n8.8.8.8\n8.8.4.4"
@@ -92,11 +94,53 @@ def _support_url_value() -> str:
     return _secret_file_value("HIDDIFY_SUPPORT_URL")
 
 
+def _load_telegram_ui_settings() -> dict:
+    try:
+        path = Path(TELEGRAM_UI_SETTINGS_PATH)
+        if not path.exists():
+            return {}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_telegram_ui_settings(data: dict) -> None:
+    path = Path(TELEGRAM_UI_SETTINGS_PATH)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _telegram_registration_mode_value() -> str:
+    data = _load_telegram_ui_settings()
+    value = str(data.get("telegram_registration_mode") or "").strip().lower()
+    if value in {"auto", "admin_only"}:
+        return value
+    env_val = (os.environ.get("HIDDIFY_TELEGRAM_REGISTRATION_MODE", "") or "").strip().lower()
+    if env_val in {"auto", "admin_only"}:
+        return env_val
+    file_val = _secret_file_value("HIDDIFY_TELEGRAM_REGISTRATION_MODE").strip().lower()
+    if file_val in {"auto", "admin_only"}:
+        return file_val
+    return "admin_only"
+
+
 class BusinessSettingsForm(FlaskForm):
     telegram_bot_token = wtf.StringField(_("Токен Telegram бота"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^([0-9]{8,12}:[a-zA-Z0-9_-]{30,40})$", re.IGNORECASE, _("config.Invalid_telegram_bot_token"))], description=_("Токен из @BotFather для работы коммерческого Telegram-бота."), render_kw={"class": "ltr", "placeholder": "123456789:AA..."})
     telegram_webhook_domain = wtf.StringField(_("Домен Telegram webhook"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^([A-Za-z0-9.-]+\.[A-Za-z]{2,})$", re.IGNORECASE, _("config.Invalid_domain"))], description=_("Фиксированный домен для webhook. Если пусто - используется домен панели (полезно для стабильности webhook при нескольких direct-доменах)."), render_kw={"class": "ltr", "placeholder": "tgbot.example.com"})
     telegram_payment_provider_token = wtf.StringField(_("YooKassa provider token (Telegram payments)"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^([0-9]{5,}:[A-Za-z0-9_:-]+)$", re.IGNORECASE, _("Invalid YooKassa/Telegram provider token"))], description=_("Токен Telegram Payments provider (YooKassa через BotFather)."), render_kw={"class": "ltr"})
     support_url = wtf.StringField(_("Ссылка поддержки"), validators=[wtf.validators.Optional(), wtf.validators.Regexp(r"^(https?://|tg://|mailto:|tel:).+", re.IGNORECASE, _("Invalid support URL"))], description=_("Ссылка поддержки для пользователя, которая есть у него (например в меню или кнопке обращения к администратору)."), render_kw={"class": "ltr"})
+    telegram_registration_mode = wtf.SelectField(
+        _("Режим регистрации в Telegram"),
+        choices=[
+            ("admin_only", "Ручная (через админа)"),
+            ("auto", "Автоматическая"),
+        ],
+        validate_choice=False,
+        description=_("Определяет, может ли новый пользователь зарегистрироваться в боте автоматически."),
+    )
     telegram_instruction_button_text = wtf.StringField(_("Текст кнопки инструкции"), validators=[wtf.validators.Optional(), wtf.validators.Length(max=64)], description=_("Текст reply-кнопки, которая отправляет сохранённое приветственное сообщение."))
     telegram_welcome_message = wtf.TextAreaField(_("Приветственное сообщение / инструкция"), validators=[wtf.validators.Optional(), wtf.validators.Length(max=4000)], description=_("Сообщение один раз для новых пользователей Telegram и по кнопке Инструкция. Поддерживается HTML и ссылки."), render_kw={"rows": 8})
     telegram_subscription_expiry_reminder_days = wtf.StringField(_("Дни до напоминания о продлении"), validators=[wtf.validators.Optional(), wtf.validators.Length(max=64)], description=_("Список через запятую, например 2,1. Бот напомнит за столько дней до окончания подписки."))
@@ -209,6 +253,7 @@ class BusinessAdmin(FlaskView):
             telegram_webhook_domain=_telegram_webhook_domain_value() or "",
             telegram_payment_provider_token=telegram_payment_provider_token(),
             support_url=_support_url_value() or "",
+            telegram_registration_mode=_telegram_registration_mode_value(),
             telegram_instruction_button_text=hconfig(ConfigEnum.telegram_instruction_button_text) or "Инструкция",
             telegram_welcome_message=hconfig(ConfigEnum.telegram_welcome_message) or "",
             telegram_subscription_expiry_reminder_days=hconfig(ConfigEnum.telegram_subscription_expiry_reminder_days) or "2,1",
@@ -296,6 +341,9 @@ class BusinessAdmin(FlaskView):
             COMMERCIAL_ROUTING_DIRECT_DNS_KEY: (form.commercial_direct_dns_servers.data or "").strip(),
             COMMERCIAL_ROUTING_PROXY_DNS_KEY: (form.commercial_proxy_dns_servers.data or "").strip(),
         }
+        telegram_registration_mode = (form.telegram_registration_mode.data or "").strip().lower()
+        if telegram_registration_mode not in {"auto", "admin_only"}:
+            telegram_registration_mode = "admin_only"
         active_section = self._active_section(old_configs)
         telegram_keys = {
             ConfigEnum.telegram_bot_token,
@@ -336,6 +384,10 @@ class BusinessAdmin(FlaskView):
         if active_section == "telegram":
             for k in list(routing_keys):
                 submitted.pop(k, None)
+            current_telegram_ui = _load_telegram_ui_settings()
+            current_telegram_ui["telegram_registration_mode"] = telegram_registration_mode
+            _save_telegram_ui_settings(current_telegram_ui)
+            os.environ["HIDDIFY_TELEGRAM_REGISTRATION_MODE"] = telegram_registration_mode
         elif active_section == "routing":
             for k in list(telegram_keys):
                 submitted.pop(k, None)
@@ -448,10 +500,10 @@ class BusinessAdmin(FlaskView):
         hutils.flask.flash(_("config.configs_have_been_updated"), "success")
         default_notice = "Настройки Telegram/YooKassa сохранены." if active_section == "telegram" else "Настройки маршрутизации сохранены."
         notice = commercial_routing_notice or default_notice
+        hutils.flask.flash(notice, "success" if not commercial_routing_notice else "info")
         if reset_action:
             return reset_action
-        return self._render_settings(
-            self._build_form(),
-            commercial_routing_notice=notice,
-            test_result=commercial_routing.simulate_route_match((form.test_route_input.data or "").strip(), get_hconfigs(), commercial_routing.load_enabled_custom_rules()) if (form.test_route_input.data or "").strip() else None,
-        )
+        params = {"section": active_section}
+        if (form.test_route_input.data or "").strip():
+            params["test_route"] = (form.test_route_input.data or "").strip()
+        return redirect(f"{request.path}?{urlencode(params)}")

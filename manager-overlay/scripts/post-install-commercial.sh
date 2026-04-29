@@ -296,6 +296,11 @@ get_owner_uuid() {
 print_summary() {
     local owner_uuid=""
     owner_uuid="$(get_owner_uuid)"
+    local c_reset="\033[0m"
+    local c_bold="\033[1m"
+    local c_cyan="\033[36m"
+    local c_green="\033[32m"
+    local c_yellow="\033[33m"
 
     echo "Commercial post-install completed."
     echo "Install dir: $INSTALL_DIR"
@@ -323,8 +328,9 @@ print_summary() {
     fi
     echo "Telegram bot registration mode: ${HIDDIFY_TELEGRAM_REGISTRATION_MODE}"
     if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$owner_uuid" ]]; then
-        echo "Bind admin notifications in Telegram with:"
-        echo "/start admin_$owner_uuid"
+        printf "%b\n" "${c_yellow}${c_bold}Bind admin notifications in Telegram with:${c_reset}"
+        printf "%b\n" "${c_green}${c_bold}/start admin_${owner_uuid}${c_reset}"
+        printf "%b\n" "${c_cyan}(send this command in your Telegram bot chat as owner admin)${c_reset}"
     fi
     echo "Note: current commercial build includes the tested trial onboarding profile by code."
 }

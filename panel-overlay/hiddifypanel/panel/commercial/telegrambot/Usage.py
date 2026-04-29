@@ -4,8 +4,10 @@ from flask_babel import gettext as _
 from flask_babel import force_locale
 from flask import current_app as app, has_request_context, g
 import datetime
+import json
 from celery import shared_task
 import os
+from pathlib import Path
 from sqlalchemy.exc import IntegrityError
 from hiddifypanel.models import *
 from . import bot
@@ -21,6 +23,7 @@ TRIAL_MAX_IPS = 1
 _ADMIN_NOTIFY_DEDUP: dict[tuple[int, int | None, str], float] = {}
 _DEFAULT_SUPPORT_URL = "https://t.me/sisadmin_pro"
 _DEFAULT_INSTRUCTION_BUTTON_TEXT = "Инструкция"
+_TELEGRAM_UI_SETTINGS_PATH = "/opt/hiddify-manager/hiddify-panel/var/business-telegram-ui.json"
 
 
 def _is_admin_chat(chat_id: int | None) -> bool:
@@ -115,7 +118,16 @@ def _send_first_link_welcome(chat_id: int, user: User) -> bool:
 
 
 def _auto_registration_enabled() -> bool:
-    mode = (os.environ.get("HIDDIFY_TELEGRAM_REGISTRATION_MODE", "admin_only") or "").strip().lower()
+    mode = ""
+    try:
+        data = json.loads(Path(_TELEGRAM_UI_SETTINGS_PATH).read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            mode = str(data.get("telegram_registration_mode") or "").strip().lower()
+    except Exception:
+        mode = ""
+
+    if mode not in {"auto", "admin_only"}:
+        mode = (os.environ.get("HIDDIFY_TELEGRAM_REGISTRATION_MODE", "admin_only") or "").strip().lower()
     return mode in {"auto", "open", "public", "1", "true", "yes", "on"}
 
 

@@ -13,6 +13,7 @@ HIDDIFY_TELEGRAM_WEBHOOK_SECRET="${HIDDIFY_TELEGRAM_WEBHOOK_SECRET:-}"
 HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN="${HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN:-}"
 HIDDIFY_SUPPORT_URL="${HIDDIFY_SUPPORT_URL:-}"
 HIDDIFY_TELEGRAM_REGISTRATION_MODE="${HIDDIFY_TELEGRAM_REGISTRATION_MODE:-}"
+FORCE_PROMPTS="${FORCE_PROMPTS:-1}"
 
 require_root() {
     if [[ "$(id -u)" -ne 0 ]]; then
@@ -40,7 +41,7 @@ prompt_value() {
     local secret="${4:-0}"
     local current_value="${!var_name:-}"
 
-    if [[ -n "$current_value" ]]; then
+    if [[ "$FORCE_PROMPTS" != "1" && -n "$current_value" ]]; then
         return 0
     fi
 
@@ -52,6 +53,9 @@ prompt_value() {
         else
             read -r -s -p "$prompt_text: " answer
             echo
+        fi
+        if [[ -z "$answer" && -n "$default_value" ]]; then
+            answer="$default_value"
         fi
     elif [[ -n "$default_value" ]]; then
         if [[ -r /dev/tty ]]; then
@@ -77,7 +81,7 @@ prompt_yes_no() {
     local default_value="${3:-N}"
     local current_value="${!var_name:-}"
 
-    if [[ -n "$current_value" ]]; then
+    if [[ "$FORCE_PROMPTS" != "1" && -n "$current_value" ]]; then
         return 0
     fi
 
@@ -155,7 +159,7 @@ EOF
 collect_inputs() {
     prompt_yes_no ENABLE_TELEGRAM_BOT "Enable Telegram bot?" "Y"
     if [[ "$ENABLE_TELEGRAM_BOT" == "1" ]]; then
-        prompt_value TELEGRAM_BOT_TOKEN "Telegram bot token"
+        prompt_value TELEGRAM_BOT_TOKEN "Telegram bot token" "$TELEGRAM_BOT_TOKEN" 1
         prompt_value HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN "Fixed Telegram webhook domain (FQDN, e.g. tgpanel.example.com)" "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN"
         HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN="$(normalize_webhook_domain "$HIDDIFY_TELEGRAM_WEBHOOK_DOMAIN")"
         prompt_value HIDDIFY_SUPPORT_URL "Support URL for user contact (Telegram/WhatsApp/site)" "$HIDDIFY_SUPPORT_URL"
@@ -171,7 +175,7 @@ collect_inputs() {
         fi
         prompt_yes_no ENABLE_TELEGRAM_PAYMENTS "Enable Telegram payments (YooKassa) now?" "N"
         if [[ "$ENABLE_TELEGRAM_PAYMENTS" == "1" ]]; then
-            prompt_value TELEGRAM_PAYMENT_PROVIDER_TOKEN "YooKassa provider token for Telegram (from BotFather)" "" 1
+            prompt_value TELEGRAM_PAYMENT_PROVIDER_TOKEN "YooKassa provider token for Telegram (from BotFather)" "$TELEGRAM_PAYMENT_PROVIDER_TOKEN" 1
         else
             TELEGRAM_PAYMENT_PROVIDER_TOKEN=""
         fi
